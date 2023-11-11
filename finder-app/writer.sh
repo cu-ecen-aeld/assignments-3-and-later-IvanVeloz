@@ -11,3 +11,10 @@
 #
 # Example:
 #       writer.sh /tmp/aesd/assignment1/sample.txt ios
+# Creates file:
+#
+#    /tmp/aesd/assignment1/sample.txt
+#
+#            With content:
+#
+#            ios
