@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Write a shell script finder-app/writer.sh as described below
 #
@@ -18,3 +18,35 @@
 #            With content:
 #
 #            ios
+
+if [ $# -ne 2 ]
+then
+    echo "Usage: writer.sh [filepath] [textstring]"
+    echo "Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios"
+    exit 1
+fi
+
+filepath=$1
+textstring=$2
+
+echo ${filepath}
+dirpath=$(dirname ${filepath})
+
+if [ ! -d ${dirpath} ]
+then
+    if ! mkdir -p ${dirpath}
+    then
+        echo "Cannot create directory for file!"
+        exit 1
+    fi
+fi
+
+
+if ! touch ${filepath}
+then
+    echo "Cannot create or write to file!"
+    exit 1
+fi
+
+echo "${textstring}" > ${filepath}
+exit 0
