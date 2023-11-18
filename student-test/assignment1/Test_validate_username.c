@@ -15,23 +15,8 @@
 void test_validate_my_username()
 {
 
-    /**
-     * TODO: Replace the line below with your code here as described above to verify your /conf/username.txt 
-     * config file and my_username() functions are setup properly
-     */
     const char *hardUN = my_username();
     char *confUN = malloc_username_from_conf_file();
-    
-    /*
-    bool namesMatch = true;
-
-    for(int i=0; namesMatch; i++) {
-        if(*(hardUN+i) && *(confUN+i)) // if both are not NULL
-            namesMatch = *(hardUN+i) == *(confUN+i);
-        else
-            namesMatch = false;
-    } 
-    */
 
     TEST_ASSERT_EQUAL_STRING_MESSAGE(hardUN, confUN, "The username on username.txt does not match my_username()");
 
