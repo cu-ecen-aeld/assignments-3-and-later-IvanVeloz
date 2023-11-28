@@ -22,20 +22,21 @@ int main(int argc, char *argv[]) {
     printf("Found %i arguments\n", argc);
     printArgs(argc, argv);
 
-    if(validateArgs)
+    if(validateArgs(argc))
         return 1;
     
     return 0;
 }
 
-int validateArgs(int argc, char argvp[]) {
+int validateArgs(int argc) {
     if (argc != 3 ) {
         printf("Usage: writer.sh [filepath] [textstring]\n");
-        printf("Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios");
+        printf("Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios\n");
         return 1;
     }
-    else
+    else {
         return 0;
+    }
 }
 
 // Test function, not used
