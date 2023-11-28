@@ -15,8 +15,38 @@
 */
 
 #include <stdio.h>
+#include "writer.h"
 
-int main() {
+int main(int argc, char *argv[]) {
     printf("Hello World\n");
-    return 1;   // because it's incomplete
+    printf("Found %i arguments\n", argc);
+    printArgs(argc, argv);
+
+    if(validateArgs)
+        return 1;
+    
+    return 0;
+}
+
+int validateArgs(int argc, char argvp[]) {
+    if (argc != 3 ) {
+        printf("Usage: writer.sh [filepath] [textstring]\n");
+        printf("Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios");
+        return 1;
+    }
+    else
+        return 0;
+}
+
+// Test function, not used
+int printArgs(int argc, char *argv[]) {
+    if (argc > 0) {
+        for(int i = 0; i<argc; i++) {
+            printf("%s, ",argv[i]);
+        }
+        printf("\n");
+        return 0;
+    }
+    else
+        return 1;
 }
