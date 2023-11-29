@@ -48,13 +48,20 @@ int main(int argc, char *argv[]) {
     char *filepath = argv[1];
     char *textstring = argv[2];
 
+    if (mk_dir_r(filepath)) {
+        perror("main: mk_dir_r");
+        return 1;
+    }
+
     int desc = open_file(filepath); 
     if(desc == -1) {
-        perror("main: open_file(filepath)");
+        perror("main: open_file");
         return 1;
     }
 
     // Write text string to file here
+
+    
     close_file(desc);
     return 0;
 }
