@@ -15,20 +15,36 @@
 */
 
 #include <stdio.h>
+#include <errno.h>
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
     printf("Hello World\n");
     printf("Found %i arguments\n", argc);
-    printArgs(argc, argv);
+    print_args(argc, argv);
 
-    if(validateArgs(argc))
-        return 1;
+    if(validate_args(argc))
+        return 1; // failed validation
     
+    char *filepath = argv[1];
+    char *textstring = argv[2];
+
+    //char *dirpath = 
+
     return 0;
 }
 
-int validateArgs(int argc) {
+/* Validates that the argument count is correct for the usage of the program.
+ * If the argument count is not 3 (that is, 2 arguments passed), the function
+ * prints usage information and returns a non-zero value.
+ * 
+ * Parameters:
+ *   int argc   number of arguments passed.
+ * Returns:
+ *   0 on sucess
+ *   Others on error.
+ */
+int validate_args(int argc) {
     if (argc != 3 ) {
         printf("Usage: writer.sh [filepath] [textstring]\n");
         printf("Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios\n");
@@ -39,8 +55,46 @@ int validateArgs(int argc) {
     }
 }
 
-// Test function, not used
-int printArgs(int argc, char *argv[]) {
+/* Opens the specified file. If this file does not exist, the file is created in the directory where it belongs. If 
+ *  that directory does not exist, it is created. If the directory containing that directory does not exist, it is 
+ *  created, etc.
+ *
+ *  Parameters:
+ *    char *path pointer to a string containing the path of the file. Examples:
+ *               /home/ivan/testfolder1/myfile.txt
+ *               "/home/ivan/aesd tests/test/file2.txt"
+ *  Returns:
+ *    0  on success
+ *   -1  on unspecified error
+ *   You may want to check errno for the last system call error.
+ */
+int open_file(char *path) {
+    return -1;
+}
+
+/* Creates the specified directory. 
+ *  Parameters:
+ *    char *path pointer to a string containing the path of the dir. Examples:
+ *               /home/ivan/testfolder1/
+ *               "/home/ivan/aesd tests/test/"
+ *  Returns:
+ *    0  on success
+ *   -1  on unspecified error
+ *   -2  when one or more parent directories do not exist
+ *   You may want to check errno for the last system call error.
+ */
+int mk_dir() {
+    return -1;
+}
+
+/* Test function. Prints the argument strings passed to the program as comma
+ * separated values. The final value has a comma on it also, for simplicity.
+ * 
+ * Parameters:
+ *   int argc   argument count.
+ *   char *argv array of char pointers. These point to the argument strings.
+ */
+int print_args(int argc, char *argv[]) {
     if (argc > 0) {
         for(int i = 0; i<argc; i++) {
             printf("%s, ",argv[i]);
