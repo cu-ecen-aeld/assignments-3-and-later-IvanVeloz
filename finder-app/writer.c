@@ -16,6 +16,9 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
@@ -29,7 +32,7 @@ int main(int argc, char *argv[]) {
     char *filepath = argv[1];
     char *textstring = argv[2];
 
-    //char *dirpath = 
+    open_file(filepath); 
 
     return 0;
 }
@@ -65,13 +68,23 @@ int validate_args(int argc) {
  *               /home/ivan/testfolder1/myfile.txt
  *               "/home/ivan/aesd tests/test/file2.txt"
  *  Returns:
- *     0  on success
- *    -1  on unspecified error
- *   You may want to check errno for the last system call error.
+ *    int file descriptor
+ *   You may want to check errno for the open() function call error.
  */
 int open_file(char *path) {
-    return -1;
+    
+    int errOpen = 0;
+    int fileDesc = open(path, FLAGS_OPEN, MODE_OPEN);
+    if (fileDesc == -1) {
+        errOpen = errno;
+        perror("open_file: open(path, FLAGS_OPEN)");
+    }
+    printf("File descriptor: %i", fileDesc);
+    errno = errOpen;
+    return fileDesc;
 }
+
+// Create an inline function to close the file (just a wrapper for close())
 
 /* Creates the specified directory. 
  *  Parameters:
@@ -87,6 +100,8 @@ int open_file(char *path) {
 int mk_dir() {
     return -1;
 }
+
+// Create a function for recursive mkdir
 
 /* Test function. Prints the argument strings passed to the program as comma
  * separated values. The final value has a comma on it also, for simplicity.
