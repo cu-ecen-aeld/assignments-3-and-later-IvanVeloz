@@ -25,11 +25,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <libgen.h>
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
@@ -128,11 +131,10 @@ inline int close_file(int desc) {
  *  Returns:
  *     0  on success
  *    -1  on unspecified error
- *    -2  when one or more parent directories do not exist
  *   You may want to check errno for the last system call error.
  */
-inline int mk_dir(char *path) {
-    return mkdir(path, MODE_OPEN);
+inline int mk_dir(const char *path) {
+    return mkdir(path, MODE_MKDIR);
 }
 
 /* Recursively creates the specified directory. 
@@ -143,24 +145,66 @@ inline int mk_dir(char *path) {
  *  Returns:
  *     0  on success
  *    -1  on unspecified error
- *    -2  when one or more parent directories do not exist
  *   You may want to check errno for the last system call error.
  */
-int mk_dir_r(char *path) {
-    // TODO: recursive implementation
-    return mk_dir(path);
-}
+int mk_dir_r(const char *path) {
+    // Hold on to your seats everyone, we're about to deal with malloc 🙃
+    // The reason for working on a copy is we don't want alter the path
 
-/* Gets the path of the parent directory, for a given path.
- *  Parameters:
-      char *path pointer to a string containing the path of the file or dir.
-      char *parent pointer to a string containing the path of the parent dir.
-    Returns:
-      0 on success
-      -1 on unspecified error
- */
-int get_parent_dir(const char *path, char *parent) {
+    int e = 0;
+    char *err_context = "mk_dir_r";
+    char *parent = malloc(strlen(path)+1);
+    char *p = parent; // pointer so we can free the memory later
+    int dir = 0;
 
+    // Not the best algorithm in terms of processing time but it uses less
+    // memory than making a list of all the directories we need to create.
+    // The best thing would be to do it from root down. This is the opposite 
+    // because I insisted on using dirname() for manipulating the path.
+
+    for(int i=0; i<254; i++) {
+        strcpy(parent, path);
+        dir = open(dirname(parent),__O_DIRECTORY);
+        if(dir != -1){
+            // success!
+            close(dir);
+            free(p);
+            return 0;
+        }
+        else {
+            if (errno == ENOENT) {
+                // Try to create the parent directory, then the parent's parent, 
+                // etc. until successful or until an error is thrown by mk_dir.
+                int j = 0; // implements timeout for safety
+                int er = 0;
+                strcpy(parent, path);
+                do {
+                    j++;
+                    parent = dirname(parent);
+                    printf("mk_dir_r: dirname: %s\n", parent);
+                    er = mk_dir(parent);
+                    // Don't add anything here; errno musn't change.
+                } while(er && errno == ENOENT && j<254);
+                if(er) {
+                    err_context = "mk_dir_r: mk_dir";
+                    goto ErrorCleanup;
+                }      
+            }
+            else {
+                err_context = "open(parent,__O_DIRECTORY)";
+                goto ErrorCleanup;
+            }
+        }
+    }
+    ErrorCleanup:
+        e = errno;
+        printf("Error in mk_dir_r:\n");
+        perror(err_context);
+        printf("parent was: %s\n",parent);
+        printf("path was: %s\n", path);
+        free(p);
+        errno = e;
+        return -1;
 }
 
 /* Test function. Prints the argument strings passed to the program as comma
