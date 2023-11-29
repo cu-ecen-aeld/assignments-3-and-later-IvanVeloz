@@ -55,17 +55,18 @@ int validate_args(int argc) {
     }
 }
 
-/* Opens the specified file. If this file does not exist, the file is created in the directory where it belongs. If 
- *  that directory does not exist, it is created. If the directory containing that directory does not exist, it is 
- *  created, etc.
+/* Opens the specified file. If this file does not exist, the file is created 
+ * in the directory where it belongs. If  *  that directory does not exist, it 
+ * is created. If the directory containing that directory does not exist, it is 
+ * created, etc.
  *
  *  Parameters:
  *    char *path pointer to a string containing the path of the file. Examples:
  *               /home/ivan/testfolder1/myfile.txt
  *               "/home/ivan/aesd tests/test/file2.txt"
  *  Returns:
- *    0  on success
- *   -1  on unspecified error
+ *     0  on success
+ *    -1  on unspecified error
  *   You may want to check errno for the last system call error.
  */
 int open_file(char *path) {
@@ -78,9 +79,9 @@ int open_file(char *path) {
  *               /home/ivan/testfolder1/
  *               "/home/ivan/aesd tests/test/"
  *  Returns:
- *    0  on success
- *   -1  on unspecified error
- *   -2  when one or more parent directories do not exist
+ *     0  on success
+ *    -1  on unspecified error
+ *    -2  when one or more parent directories do not exist
  *   You may want to check errno for the last system call error.
  */
 int mk_dir() {
