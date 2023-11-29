@@ -14,11 +14,22 @@
 
 */
 
+/*
+ * References used:
+ *  * Linux System Programming, 2nd edition, by Robert Love. O'Reily, May 2013.
+ *  * 21st Century C, 2nd edition, by Ben Klemens. O'Reilly, September 2014.
+ *  * The GNU C Library Reference Manual, for version 2.38, by the Free Software Foundation. 
+ *    Online, retreived Nov 29 2023 from 
+ *    https://www.gnu.org/software/libc/manual/html_node/index.html
+ *  * Linux Programmer's Manual (manpages).
+ */
+
 #include <stdio.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
@@ -32,8 +43,14 @@ int main(int argc, char *argv[]) {
     char *filepath = argv[1];
     char *textstring = argv[2];
 
-    open_file(filepath); 
+    int desc = open_file(filepath); 
+    if(desc == -1) {
+        perror("main: open_file(filepath)");
+        return 1;
+    }
 
+    // Write text string to file here
+    close_file(desc);
     return 0;
 }
 
@@ -72,19 +89,36 @@ int validate_args(int argc) {
  *   You may want to check errno for the open() function call error.
  */
 int open_file(char *path) {
-    
     int errOpen = 0;
     int fileDesc = open(path, FLAGS_OPEN, MODE_OPEN);
     if (fileDesc == -1) {
         errOpen = errno;
-        perror("open_file: open(path, FLAGS_OPEN)");
+        if (errOpen == ENOENT) {    //"no such file or directory"
+            // Create directories recursively
+            mk_dir_r(path);
+            // Try to open again
+            fileDesc = open(path, FLAGS_OPEN, MODE_OPEN);
+            errOpen = errno;
+            if(fileDesc == -1)
+                perror("open_file: open() after path directory creation");
+        }
+        else {
+            perror("open_file: open() before path directory creation");
+        }
     }
-    printf("File descriptor: %i", fileDesc);
     errno = errOpen;
     return fileDesc;
 }
 
-// Create an inline function to close the file (just a wrapper for close())
+/* Closes the specified file. Wrapper for close()
+ * Parameters:
+ *   int desc   file descriptor
+ * Returns
+ *   zero on success. On error, -1 is returned and errno is set appropriately.
+ */
+inline int close_file(int desc) {
+    return (close(desc));
+}
 
 /* Creates the specified directory. 
  *  Parameters:
@@ -97,11 +131,37 @@ int open_file(char *path) {
  *    -2  when one or more parent directories do not exist
  *   You may want to check errno for the last system call error.
  */
-int mk_dir() {
-    return -1;
+inline int mk_dir(char *path) {
+    return mkdir(path, MODE_OPEN);
 }
 
-// Create a function for recursive mkdir
+/* Recursively creates the specified directory. 
+ *  Parameters:
+ *    char *path pointer to a string containing the path of the dir. Examples:
+ *               /home/ivan/testfolder1/
+ *               "/home/ivan/aesd tests/test/"
+ *  Returns:
+ *     0  on success
+ *    -1  on unspecified error
+ *    -2  when one or more parent directories do not exist
+ *   You may want to check errno for the last system call error.
+ */
+int mk_dir_r(char *path) {
+    // TODO: recursive implementation
+    return mk_dir(path);
+}
+
+/* Gets the path of the parent directory, for a given path.
+ *  Parameters:
+      char *path pointer to a string containing the path of the file or dir.
+      char *parent pointer to a string containing the path of the parent dir.
+    Returns:
+      0 on success
+      -1 on unspecified error
+ */
+int get_parent_dir(const char *path, char *parent) {
+
+}
 
 /* Test function. Prints the argument strings passed to the program as comma
  * separated values. The final value has a comma on it also, for simplicity.

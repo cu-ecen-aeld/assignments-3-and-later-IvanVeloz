@@ -1,8 +1,10 @@
 int main(int argc, char *argv[]);
 int validate_args(int argc);
 int open_file(char *path);
+inline int close_file(int desc);
 int touch_file(void);
-int mk_dir(void);
+inline int mk_dir(char *path);
+int mk_dir_r(char *path);
 int print_args(int argc, char *argv[]);
 
 /* Flags for file opening.
