@@ -22,6 +22,8 @@
  *    Online, retreived Nov 29 2023 from 
  *    https://www.gnu.org/software/libc/manual/html_node/index.html
  *  * Linux Programmer's Manual (manpages).
+ * 
+ * No examples were used, only the API descriptions.
  */
 
 #include <stdio.h>
@@ -36,9 +38,9 @@
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
-    printf("Hello World\n");
-    printf("Found %i arguments\n", argc);
-    print_args(argc, argv);
+    //printf("Hello World\n");
+    //printf("Found %i arguments\n", argc);
+    //print_args(argc, argv);
 
     if(validate_args(argc))
         return 1; // failed validation
@@ -181,7 +183,7 @@ int mk_dir_r(const char *path) {
                 do {
                     j++;
                     parent = dirname(parent);
-                    printf("mk_dir_r: dirname: %s\n", parent);
+                    //printf("mk_dir_r: dirname: %s\n", parent);
                     er = mk_dir(parent);
                     // Don't add anything here; errno musn't change.
                 } while(er && errno == ENOENT && j<254);
