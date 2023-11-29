@@ -48,6 +48,9 @@ int main(int argc, char *argv[]) {
     char *filepath = argv[1];
     char *textstring = argv[2];
 
+    char *textline = malloc(strlen(textstring) + 2);
+    textline = strcat(textstring, "\n");
+
     if (mk_dir_r(filepath)) {
         perror("main: mk_dir_r");
         return 1;
@@ -59,10 +62,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Write text string to file here
-
+    if(write(desc, textline, strlen(textline)+1) == -1) {
+        perror("main: write");
+        return 1;
+    }
     
-    close_file(desc);
+    if(close_file(desc)) {
+        perror("main: close_file");
+        return 1;
+    }
+
     return 0;
 }
 
