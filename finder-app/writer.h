@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <syslog.h>
 
 int main(int argc, char *argv[]);
 int validate_args(int argc);
@@ -9,6 +10,10 @@ int touch_file(void);
 inline int mk_dir(const char *path);
 int mk_dir_r(const char *path);
 int print_args(int argc, char *argv[]);
+
+/* Flags for syslog */
+const int SYSLOG_OPTIONS = LOG_CONS|LOG_PID|LOG_PERROR;
+const int SYSLOG_FACILITY = LOG_USER;
 
 /* Flags for file opening.
  * O_CREAT  Creates file if it doesn't exist yet.

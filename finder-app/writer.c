@@ -35,12 +35,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <syslog.h>
 #include "writer.h"
 
 int main(int argc, char *argv[]) {
-    //printf("Hello World\n");
-    //printf("Found %i arguments\n", argc);
-    //print_args(argc, argv);
+
+    openlog("writer",SYSLOG_OPTIONS,SYSLOG_FACILITY);
 
     if(validate_args(argc))
         return 1; // failed validation
@@ -48,29 +48,33 @@ int main(int argc, char *argv[]) {
     char *filepath = argv[1];
     char *textstring = argv[2];
 
+    syslog(LOG_DEBUG,"Writing %s to %s",textstring,filepath);
+
     char *textline = malloc(strlen(textstring) + 2);
     textline = strcat(textstring, "\n");
 
     if (mk_dir_r(filepath)) {
-        perror("main: mk_dir_r");
+        syslog(LOG_ERR,"main: mk_dir_r: %m");
         return 1;
     }
 
     int desc = open_file(filepath); 
     if(desc == -1) {
-        perror("main: open_file");
+        syslog(LOG_ERR,"main: open_file: %m");
         return 1;
     }
 
     if(write(desc, textline, strlen(textline)+1) == -1) {
-        perror("main: write");
+        syslog(LOG_ERR,"main: write: %m");
         return 1;
     }
     
     if(close_file(desc)) {
-        perror("main: close_file");
+        syslog(LOG_ERR,"main: close_file: %m");
         return 1;
     }
+
+    closelog();
 
     return 0;
 }
@@ -121,10 +125,10 @@ int open_file(char *path) {
             fileDesc = open(path, FLAGS_OPEN, MODE_OPEN);
             errOpen = errno;
             if(fileDesc == -1)
-                perror("open_file: open() after path directory creation");
+                syslog(LOG_ERR,"open_file: open() after path directory creation: %m");
         }
         else {
-            perror("open_file: open() before path directory creation");
+            syslog(LOG_ERR,"open_file: open() before path directory creation: %m");
         }
     }
     errno = errOpen;
@@ -216,10 +220,11 @@ int mk_dir_r(const char *path) {
     }
     ErrorCleanup:
         e = errno;
-        printf("Error in mk_dir_r:\n");
-        perror(err_context);
-        printf("parent was: %s\n",parent);
-        printf("path was: %s\n", path);
+        syslog(LOG_ERR,"Error in mk_dir_r...");
+        errno = e;
+        syslog(LOG_ERR,"%s: %m",err_context);
+        syslog(LOG_DEBUG,"parent was: %s\n",parent);
+        syslog(LOG_DEBUG,"path was: %s\n", path);
         free(p);
         errno = e;
         return -1;
