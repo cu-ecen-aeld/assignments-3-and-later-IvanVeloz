@@ -1,0 +1,6 @@
+ivan@aeld:~/assignment-2-IvanVeloz/finder-app$ make -e CROSS_COMPILE=aarch64-none-linux-gnu-
+aarch64-none-linux-gnu-gcc  -g -Wall -O3 -std=c11     -c -o writer.o writer.c
+aarch64-none-linux-gnu-gcc  -g -Wall -O3 -std=c11   -o writer writer.o
+ivan@aeld:~/assignment-2-IvanVeloz/finder-app$ file writer
+writer: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, with debug_info, not stripped
+ivan@aeld:~/assignment-2-IvanVeloz/finder-app$
