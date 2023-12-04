@@ -48,9 +48,11 @@ then
 		exit 1
 	fi
 fi
-echo "Skipping the old writer utility and compiling as a native application"
-make clean
-make
+# Assignment 3, step 1: "modify [this script] to remove the make step"
+#   [...] will add a cross-compile make step for this utility in a different script
+#echo "Skipping the old writer utility and compiling as a native application"
+#make clean
+#make
 
 for i in $( seq 1 $NUMFILES)
 do
