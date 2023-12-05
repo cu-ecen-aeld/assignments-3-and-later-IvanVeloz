@@ -53,6 +53,8 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
  */
+    fflush(stdout);
+    fflush(stderr);
     pid_t pid = fork();
 
     if(pid == -1) {
