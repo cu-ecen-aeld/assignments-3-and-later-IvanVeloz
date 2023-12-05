@@ -66,6 +66,7 @@ bool do_exec(int count, ...)
     else if(pid != 0) {
         // This process is the child process
         int ret;
+        printf("do_exec: child process: command path is %s\n", command[0]);
         ret = execv(command[0],&command[1]);
         // I am assuming that the second argument is the name of the program
         perror("do_exec: child process: execv failed");
@@ -81,14 +82,14 @@ bool do_exec(int count, ...)
     }
 
     if(WIFEXITED(childstatus) == false) {
-        fprintf(stderr,"do_exec: WIFEXITED(): child didn't exit normally, wstatus is %i", childstatus);
+        fprintf(stderr,"do_exec: WIFEXITED(): child didn't exit normally, wstatus is %i\n", childstatus);
         va_end(args);
         return false;
     }
 
     int exitstatus = WEXITSTATUS(childstatus);
     if(exitstatus != 0) {
-        fprintf(stderr,"do_exec: WEXITSTATUS(): child exited with status %i", exitstatus);
+        fprintf(stderr,"do_exec: WEXITSTATUS(): child exited with status %i\n", exitstatus);
         va_end(args);
         return false;
     }
