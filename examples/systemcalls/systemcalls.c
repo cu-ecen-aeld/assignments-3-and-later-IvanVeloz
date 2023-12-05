@@ -80,8 +80,7 @@ bool do_exec(int count, ...)
     }
 
     if(WIFEXITED(childstatus) == false) {
-        fprintf(stderr,"do_exec: WIFEXITED(): child didn't exit normally");
-        // print the return value for more debugging info
+        fprintf(stderr,"do_exec: WIFEXITED(): child didn't exit normally, wstatus is %i", childstatus);
         va_end(args);
         return false;
     }
