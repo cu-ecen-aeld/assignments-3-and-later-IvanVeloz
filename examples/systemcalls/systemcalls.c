@@ -1,3 +1,6 @@
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include "systemcalls.h"
 
 /**
@@ -49,10 +52,46 @@ bool do_exec(int count, ...)
  *   (first argument to execv), and use the remaining arguments
  *   as second argument to the execv() command.
  *
-*/
+ */
+    pid_t pid = fork();
+
+    if(pid == -1) {
+        perror("do_exec: fork() failed");
+        va_end(args);
+        return false;
+    }
+    else if(pid != 0) {
+        // This process is the child process
+        int ret;
+        ret = execv(command[0],&command[1]);
+        // I am assuming that the second argument is the name of the program
+        perror("do_exec: child process: execv failed");
+        exit(ret); // terminate the child with ret as the return value
+    }
+
+    int childstatus;
+    pid_t r = waitpid(pid, &childstatus,0);
+    if(r == -1){
+        perror("do_exec: wait() failed");
+        va_end(args);
+        return false;
+    }
+
+    if(WIFEXITED(childstatus) == false) {
+        fprintf(stderr,"do_exec: WIFEXITED(): child didn't exit normally");
+        // print the return value for more debugging info
+        va_end(args);
+        return false;
+    }
+
+    int exitstatus = WEXITSTATUS(childstatus);
+    if(exitstatus != 0) {
+        fprintf(stderr,"do_exec: WEXITSTATUS(): child exited with status %i", exitstatus);
+        va_end(args);
+        return false;
+    }
 
     va_end(args);
-
     return true;
 }
 
