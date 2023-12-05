@@ -2,6 +2,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <libgen.h>
+#include <string.h>
 #include "systemcalls.h"
 
 /**
@@ -63,12 +65,14 @@ bool do_exec(int count, ...)
         va_end(args);
         return false;
     }
-    else if(pid != 0) {
+    else if(pid == 0) {
         // This process is the child process
         int ret;
         printf("do_exec: child process: command path is %s\n", command[0]);
-        ret = execv(command[0],&command[1]);
-        // I am assuming that the second argument is the name of the program
+        for(int i = 1; i<count; i++) {
+            printf("do_exec: child process: command arg %i is %s\n",i,command[i]);
+        }
+        ret = execv(command[0],command);
         perror("do_exec: child process: execv failed");
         exit(ret); // terminate the child with ret as the return value
     }
@@ -94,6 +98,7 @@ bool do_exec(int count, ...)
         return false;
     }
 
+    printf("do_exec: status was %i\n", exitstatus);
     va_end(args);
     return true;
 }
