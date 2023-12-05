@@ -69,7 +69,7 @@ bool do_exec(int count, ...)
         // This process is the child process
         int ret;
         printf("do_exec: child process: command path is %s\n", command[0]);
-        for(int i = 1; i<count; i++) {
+        for(int i = 0; i<count; i++) {
             printf("do_exec: child process: command arg %i is %s\n",i,command[i]);
         }
         ret = execv(command[0],command);
