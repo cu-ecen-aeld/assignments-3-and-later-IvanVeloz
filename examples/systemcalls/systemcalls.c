@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <string.h>
+#include <fcntl.h>
 #include "systemcalls.h"
 
 /**
@@ -48,7 +49,7 @@ bool do_exec(int count, ...)
     command[count] = command[count];
 
 /*
- * TODO:
+ * DONE:
  *   Execute a system command by calling fork, execv(),
  *   and wait instead of system (see LSP page 161).
  *   Use the command[0] as the full path to the command to execute
@@ -67,11 +68,11 @@ bool do_exec(int count, ...)
     }
     else if(pid == 0) {
         // This process is the child process
-        int ret;
         printf("do_exec: child process: command path is %s\n", command[0]);
         for(int i = 0; i<count; i++) {
             printf("do_exec: child process: command arg %i is %s\n",i,command[i]);
         }
+        int ret;
         ret = execv(command[0],command);
         perror("do_exec: child process: execv failed");
         exit(ret); // terminate the child with ret as the return value
@@ -125,14 +126,71 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
 
 /*
- * TODO
+ * DONE
  *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
  *   redirect standard out to a file specified by outputfile.
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT);
+    if (fd == -1) {
+        perror("do_exec_redirect: open");
+        va_end(args);
+        return false;
+    }
 
+    fflush(stdout);
+    fflush(stderr);
+    pid_t pid = fork();
+
+    if(pid == -1) {
+        perror("do_exec_redirect: fork() failed");
+        va_end(args);
+        return false;
+    }
+    else if(pid == 0) {
+        // This process is the child process
+        if(dup2(fd,1) == -1) {
+            perror("do_exec_redirect: child: dup2");
+            exit(1);
+        }
+        close(fd);
+        /*
+        printf("do_exec_redirect: child process: command path is %s\n", command[0]);
+        for(int i = 0; i<count; i++) {
+            printf("do_exec: child process: command arg %i is %s\n",i,command[i]);
+        }
+        */
+        int ret;
+        ret = execv(command[0],command);
+        perror("do_exec_redirect: child process: execv failed");
+        exit(ret); // terminate the child with ret as the return value
+    }
+
+    close(fd);
+    int childstatus;
+    pid_t r = waitpid(pid, &childstatus,0);
+    if(r == -1){
+        perror("do_exec_redirect: wait() failed");
+        va_end(args);
+        return false;
+    }
+
+    if(WIFEXITED(childstatus) == false) {
+        fprintf(stderr,"do_exec_redirect: WIFEXITED(): child didn't exit normally, wstatus is %i\n", childstatus);
+        va_end(args);
+        return false;
+    }
+
+    int exitstatus = WEXITSTATUS(childstatus);
+    if(exitstatus != 0) {
+        fprintf(stderr,"do_exec_redirect: WEXITSTATUS(): child exited with status %i\n", exitstatus);
+        va_end(args);
+        return false;
+    }
+
+    printf("do_exec_redirect: status was %i\n", exitstatus);
     va_end(args);
-
     return true;
+
 }
