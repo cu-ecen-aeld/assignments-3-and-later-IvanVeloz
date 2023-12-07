@@ -124,7 +124,11 @@ cp libm.so.6 libresolv.so.2 libc.so.6\
     ${OUTDIR}/rootfs/lib64/
 
 
-# TODO: Make device nodes
+# DONE: Make device nodes
+echo "Creating device node files in rootfs"
+cd "${OUTDIR}/rootfs"
+sudo mknod -m 666 dev/null c 1 3
+sudo mknod -m 666 dev/console c 1 5
 
 # TODO: Clean and build the writer utility
 
