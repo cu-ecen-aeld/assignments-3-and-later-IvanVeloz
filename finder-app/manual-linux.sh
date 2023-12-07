@@ -67,8 +67,8 @@ mkdir bin lib sbin
 cd "${OUTDIR}/rootfs/var"
 mkdir log
 
-echo "rootfs directory tree:"
-tree "${OUTDIR}/rootfs"
+#echo "rootfs directory tree:"
+#tree "${OUTDIR}/rootfs"
 
 
 
