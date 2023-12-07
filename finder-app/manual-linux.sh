@@ -69,7 +69,16 @@ mkdir log
 echo "rootfs directory tree:"
 tree "${OUTDIR}/rootfs"
 
-
+echo "changing rootfs ownership and permissions"
+# Not sure if this is necessary but it seemed wrong not to do it. After all, the
+# rootfs is going into a compressed image and should preserve the ownership and
+# permissions we set here.
+#
+# I referenced my Ubuntu installation for root filesystem owner and permissions.
+# Personally, I prefer only running the single chown as root, instead of all 
+# the mkdirs. Less lines running as root.
+chmod -R 755 "${OUTDIR}/rootfs/"
+sudo chown -R root:root "${OUTDIR}/rootfs/"
 
 
 cd "$OUTDIR"
@@ -79,6 +88,7 @@ git clone git://busybox.net/busybox.git
     cd busybox
     git checkout ${BUSYBOX_VERSION}
     # TODO:  Configure busybox
+
 else
     cd busybox
 fi
