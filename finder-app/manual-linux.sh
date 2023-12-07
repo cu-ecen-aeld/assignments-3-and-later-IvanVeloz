@@ -115,13 +115,13 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 # Program interpreter is placed in /lib directory
 # Libraries are placed in /lib64 directory (since arch is 64 bit)
 echo "Copying libraries to rootfs"
-cd ${TOOLCHAIN_LIBC_ROOT}/lib
+cd "${TOOLCHAIN_LIBC_ROOT}/lib"
 cp ld-linux-aarch64.so.1\
-    ${OUTDIR}/rootfs/lib/
+    "${OUTDIR}/rootfs/lib/"
 
-cd ${TOOLCHAIN_LIBC_ROOT}/lib64
+cd "${TOOLCHAIN_LIBC_ROOT}/lib64"
 cp libm.so.6 libresolv.so.2 libc.so.6\
-    ${OUTDIR}/rootfs/lib64/
+    "${OUTDIR}/rootfs/lib64/"
 
 
 # DONE: Make device nodes
