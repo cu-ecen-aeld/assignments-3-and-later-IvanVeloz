@@ -75,16 +75,31 @@ tree "${OUTDIR}/rootfs"
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
 then
-git clone git://busybox.net/busybox.git
+    git clone git://busybox.net/busybox.git
     cd busybox
     git checkout ${BUSYBOX_VERSION}
-    # TODO:  Configure busybox
+    # DONE:  Configure busybox
+    echo "Configuring busybox"
+    make distclean
+    make defconfig
 
 else
     cd busybox
 fi
 
-# TODO: Make and install busybox
+# DONE: Make and install busybox
+echo "Making busybox"
+make \
+    ARCH=${ARCH}\
+    CROSS_COMPILE=${CROSS_COMPILE}
+make \
+    CONFIG_PREFIX="${OUTDIR}/rootfs"\
+    ARCH=${ARCH}\
+    CROSS_COMPILE=${CROSS_COMPILE}\
+    install
+
+# Next section seems to be working from rootfs but doesn't cd; so doing it now.
+cd "$OUTDIR/rootfs"
 
 echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
@@ -99,7 +114,7 @@ ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
 
-# TODO: Chown the root directory
+# DONE: Chown the root directory
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
 # Personally, I prefer only running the single chown as root. Less lines running
 # as root.
