@@ -129,7 +129,6 @@ echo "Creating device node files in rootfs"
 cd "${OUTDIR}/rootfs"
 sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 1 5
-
 # NOTE: mknot did NOT work on a LXC container (unprivileged). If you are 
 # running this script on a Docker or LXC container and get the error below:
 #
@@ -145,10 +144,8 @@ sudo mknod -m 666 dev/console c 1 5
 
 # DONE: Chown the root directory
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
-# Personally, I prefer only running the single chown as root. Less lines running
-# as root.
-echo "changing rootfs ownership and permissions"
-chmod -R 755 "${OUTDIR}/rootfs/"
+echo "Changing rootfs ownership and permissions"
+sudo chmod -R 755 "${OUTDIR}/rootfs/" # needs sudo because of mknod -m 666 cmds
 sudo chown -R root:root "${OUTDIR}/rootfs/"
 
 # TODO: Create initramfs.cpio.gz
