@@ -40,7 +40,6 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig #assign defconfig
     make -j ${NPROC} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} Image #vmlinux
     # I really wish I had done this homework on a faster computer...
-    
 fi
 
 echo "Adding the Image in outdir"
