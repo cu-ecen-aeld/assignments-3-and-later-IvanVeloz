@@ -147,11 +147,12 @@ make
 # on the target rootfs
 echo "Copying finder related scripts and executables to /home"
 cd "${FINDER_APP_DIR}"
-cp writer finder.sh finder-test.sh\
+cp writer finder.sh finder-test.sh autorun-qemu.sh\
     "${OUTDIR}/rootfs/home/"
 mkdir -p "${OUTDIR}/rootfs/home/conf"
 cp conf/assignment.txt conf/username.txt\
     "${OUTDIR}/rootfs/home/conf"
+
 
 # DONE: Chown the root directory
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
