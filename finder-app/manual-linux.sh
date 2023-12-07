@@ -141,7 +141,7 @@ sudo mknod -m 666 dev/console c 1 5
 echo "Building writer utility"
 cd "${FINDER_APP_DIR}"
 make clean
-make
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
 
 # DONE: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
