@@ -12,6 +12,7 @@ BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
+TOOLCHAIN_LIBC_ROOT=$( dirname $( which ${CROSS_COMPILE}gcc))/../${CROSS_COMPILE%?}/libc
 
 if [ $# -lt 1 ]
 then
@@ -105,7 +106,22 @@ echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
-# TODO: Add library dependencies to rootfs
+# DONE: Add library dependencies to rootfs
+#Library dependencies
+#      [Requesting program interpreter: /lib/ld-linux-aarch64.so.1]
+# 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+# 0x0000000000000001 (NEEDED)             Shared library: [libresolv.so.2]
+# 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+# Program interpreter is placed in /lib directory
+# Libraries are placed in /lib64 directory (since arch is 64 bit)
+cd ${TOOLCHAIN_LIBC_ROOT}/lib
+cp ld-linux-aarch64.so.1\
+    ${OUTDIR}/rootfs/lib/
+
+cd ${TOOLCHAIN_LIBC_ROOT}/lib64
+cp libm.so.6 libresolv.so.2 libc.so.6\
+    ${OUTDIR}/rootfs/lib64/
+
 
 # TODO: Make device nodes
 
