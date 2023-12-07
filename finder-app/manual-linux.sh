@@ -158,7 +158,10 @@ cp conf/assignment.txt conf/username.txt\
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
 echo "Changing rootfs ownership and permissions"
 cd "${OUTDIR}/rootfs/"
-chmod -R 755  bin etc home lib lib64 proc sbin sys tmp usr var
+chmod 755  bin etc home lib lib64 proc sbin sys tmp usr var\
+           usr/bin usr/lib usr/sbin\
+           var/log
+           # don't touch the files
 chmod 755 dev # don't touch the device nodes
 sudo chown -R root:root "${OUTDIR}/rootfs/"
 
