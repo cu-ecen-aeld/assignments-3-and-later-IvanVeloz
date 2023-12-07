@@ -34,7 +34,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     echo "Checking out version ${KERNEL_VERSION}"
     git checkout ${KERNEL_VERSION}
 
-    # TODO: Add your kernel build steps here
+    # DONE: Add your kernel build steps here
     NPROC=$(nproc --all) # get the number of processors to speed up compilation
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper #cleanup
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig #assign defconfig
