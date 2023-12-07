@@ -137,10 +137,21 @@ sudo mknod -m 666 dev/console c 1 5
 # it's because unprivileges containers are not allowed to do this. I switched to
 # a virtual machine at this point, on a faster computer.
 
-# TODO: Clean and build the writer utility
+# DONE: Clean and build the writer utility
+echo "Building writer utility"
+cd "${FINDER_APP_DIR}"
+make clean
+make
 
-# TODO: Copy the finder related scripts and executables to the /home directory
+# DONE: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
+echo "Copying finder related scripts and executables to /home"
+cd "${FINDER_APP_DIR}"
+cp writer finder.sh finder-test.sh\
+    "${OUTDIR}/rootfs/home/"
+mkdir -p "${OUTDIR}/rootfs/home/conf"
+cp conf/assignment.txt conf/username.txt\
+    "${OUTDIR}/rootfs/home/conf"
 
 # DONE: Chown the root directory
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
