@@ -145,7 +145,9 @@ sudo mknod -m 666 dev/console c 1 5
 # DONE: Chown the root directory
 # I referenced my Ubuntu installation for root filesystem owner and permissions.
 echo "Changing rootfs ownership and permissions"
-sudo chmod -R 755 "${OUTDIR}/rootfs/" # needs sudo because of mknod -m 666 cmds
+cd "${OUTDIR}/rootfs/"
+chmod -R 755  bin etc home lib lib64 proc sbin sys tmp usr var
+chmod 755 dev # don't touch the device nodes
 sudo chown -R root:root "${OUTDIR}/rootfs/"
 
 # TODO: Create initramfs.cpio.gz
