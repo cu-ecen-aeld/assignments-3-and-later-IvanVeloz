@@ -52,7 +52,25 @@ then
     sudo rm  -rf ${OUTDIR}/rootfs
 fi
 
-# TODO: Create necessary base directories
+
+
+# DONE: Create necessary base directories
+mkdir "${OUTDIR}/rootfs"
+
+cd "${OUTDIR}/rootfs/"
+mkdir bin dev etc home lib lib64 proc sbin sys tmp usr var
+
+cd "${OUTDIR}/rootfs/usr"
+mkdir bin lib sbin
+
+cd "${OUTDIR}/rootfs/var"
+mkdir log
+
+echo "rootfs directory tree:"
+tree "${OUTDIR}/rootfs"
+
+
+
 
 cd "$OUTDIR"
 if [ ! -d "${OUTDIR}/busybox" ]
