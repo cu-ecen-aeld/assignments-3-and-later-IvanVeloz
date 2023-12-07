@@ -130,6 +130,14 @@ cd "${OUTDIR}/rootfs"
 sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 1 5
 
+# NOTE: mknot did NOT work on a LXC container (unprivileged). If you are 
+# running this script on a Docker or LXC container and get the error below:
+#
+# mknod: dev/null: Operation not permitted
+#
+# it's because unprivileges containers are not allowed to do this. I switched to
+# a virtual machine at this point, on a faster computer.
+
 # TODO: Clean and build the writer utility
 
 # TODO: Copy the finder related scripts and executables to the /home directory
