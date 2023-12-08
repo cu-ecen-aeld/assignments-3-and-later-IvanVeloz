@@ -20,7 +20,7 @@ void* threadfunc(void* thread_param)
     useconds_t release_time = (useconds_t) (thread_func_args->release_ms * 1000);   // warning: this is casting signed into unsigned
 
     // wait
-    if(usleep(thread_func_args->obtain_ms)) {
+    if(usleep(obtain_time)) {
         perror("threadfunc:usleep(obtain)");
     }
 
@@ -28,7 +28,7 @@ void* threadfunc(void* thread_param)
     pthread_mutex_lock (&thread_func_args->mutex);
 
     // wait
-    if(usleep(thread_func_args->release_ms)) {
+    if(usleep(release_time)) {
         perror("threadfunc:usleep(release)");
     }
 
