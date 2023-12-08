@@ -25,7 +25,7 @@ void* threadfunc(void* thread_param)
     }
 
     // obtain mutex
-    pthread_mutex_lock (&thread_func_args->mutex);
+    pthread_mutex_lock (thread_func_args->mutex);
 
     // wait
     if(usleep(release_time)) {
@@ -33,7 +33,9 @@ void* threadfunc(void* thread_param)
     }
 
     // release mutex
-    pthread_mutex_unlock (&thread_func_args->mutex);
+    pthread_mutex_unlock (thread_func_args->mutex);
+
+    thread_func_args->thread_complete_success = true;
 
     return thread_param;
 }
@@ -58,13 +60,13 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     }
 
     // DONE: setup mutex 
-    pthread_mutex_init(&td->mutex,NULL);
+    td->mutex = mutex;  //assign pointer to pointer
 
     // DONE: setup wait arguments
     td->obtain_ms = wait_to_obtain_ms;
     td->release_ms = wait_to_release_ms;
     td->thread_complete_success = false;
-
+    printf("td->obtain_ms = %i\n",td->obtain_ms);
     // TODO pass thread_data to created thread
     if (pthread_create(thread, NULL, threadfunc, td)) {
         perror("start_thread_obtaining_mutex: pthread_create");
