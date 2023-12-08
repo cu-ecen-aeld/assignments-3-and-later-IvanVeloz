@@ -66,6 +66,11 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     td->thread_complete_success = false;
 
     // TODO pass thread_data to created thread
-    
+    if (pthread_create(thread, NULL, threadfunc, td)) {
+        perror("start_thread_obtaining_mutex: pthread_create");
+        return false;
+    }
+
+    return true;
 }
 
