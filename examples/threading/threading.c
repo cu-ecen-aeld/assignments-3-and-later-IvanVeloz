@@ -12,7 +12,7 @@
 void* threadfunc(void* thread_param)
 {
     
-    // TODO: wait, obtain mutex, wait, release mutex as described by thread_data structure
+    // DONE: wait, obtain mutex, wait, release mutex as described by thread_data structure
     // hint: use a cast like the one below to obtain thread arguments from your parameter
     struct thread_data* thread_func_args = (struct thread_data *) thread_param;
 
@@ -26,6 +26,8 @@ void* threadfunc(void* thread_param)
 
     // obtain mutex
     pthread_mutex_lock (thread_func_args->mutex);
+    // "Callers tend not to check the return value, since well-formed code should not generate any errors at runtime."
+    // Linux Systems Programming, Robert Love. 
 
     // wait
     if(usleep(release_time)) {
@@ -34,6 +36,8 @@ void* threadfunc(void* thread_param)
 
     // release mutex
     pthread_mutex_unlock (thread_func_args->mutex);
+    // "As with locking, users tend not to check the return value."
+    // Linux Systems Programming, Robert Love.
 
     thread_func_args->thread_complete_success = true;
 
@@ -44,7 +48,7 @@ void* threadfunc(void* thread_param)
 bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int wait_to_obtain_ms, int wait_to_release_ms)
 {
     /**
-     * TODO: allocate memory for thread_data, setup mutex and wait arguments, pass thread_data to created thread
+     * DONE: allocate memory for thread_data, setup mutex and wait arguments, pass thread_data to created thread
      * using threadfunc() as entry point.
      *
      * return true if successful.
@@ -67,7 +71,8 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     td->release_ms = wait_to_release_ms;
     td->thread_complete_success = false;
     printf("td->obtain_ms = %i\n",td->obtain_ms);
-    // TODO pass thread_data to created thread
+    
+    // DONE: pass thread_data to created thread
     if (pthread_create(thread, NULL, threadfunc, td)) {
         perror("start_thread_obtaining_mutex: pthread_create");
         return false;
