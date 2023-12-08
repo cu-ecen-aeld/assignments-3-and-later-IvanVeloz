@@ -44,11 +44,13 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
         return false;
     }
 
-    // TODO: setup mutex 
-    
+    // DONE: setup mutex 
+    pthread_mutex_init(&td->mutex,NULL);
+
     // DONE: setup wait arguments
     td->obtain_ms = wait_to_obtain_ms;
     td->release_ms = wait_to_release_ms;
+    td->thread_complete_success = false;
 
     // TODO pass thread_data to created thread
     
