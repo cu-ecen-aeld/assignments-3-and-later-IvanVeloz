@@ -141,7 +141,7 @@ int open_file(char *path) {
  * Returns
  *   zero on success. On error, -1 is returned and errno is set appropriately.
  */
-inline int close_file(int desc) {
+extern inline int close_file(int desc) {
     return (close(desc));
 }
 
@@ -155,7 +155,7 @@ inline int close_file(int desc) {
  *    -1  on unspecified error
  *   You may want to check errno for the last system call error.
  */
-inline int mk_dir(const char *path) {
+extern inline int mk_dir(const char *path) {
     return mkdir(path, MODE_MKDIR);
 }
 
