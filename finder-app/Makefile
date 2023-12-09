@@ -11,19 +11,24 @@
 # * 21st Century C, 2nd edition, by Ben Klemens. O'Reilly, September 2014.
 # * The GNU Make Manual, for GNU make version 4.4.1, by the Free Software 
 #   Foundation. Self-published, February 2023.
+# * The class's GitHub repository sample makefile, retrieved from
+#   https://github.com/cu-ecen-aeld/ecen5013-hello-world/blob/master/Makefile
+#   on December 9th, 2023.
 #
 
-# TODO: clean target and cross-compile target
+# DONE: clean target and cross-compile target
 
 P=writer
 SOURCES= writer.c
 OBJECTS= $(SOURCES:.c=.o)
-CFLAGS= -g -Wall -O3 -std=c11  # none of that old ANSI stuff please
-CC=$(CROSS_COMPILE)gcc #if the variable is undefined, this will default to "gcc"
 
 all: $(P)
+
+$(P).o: $(P).c
+	$(CC) $(CCFLAGS) -std=c11 -c $(SOURCES)
+
 $(P): $(OBJECTS)
-	$(CC) $(CFLAGS) -o $(P) $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $(P)
 
 clean:
 	rm -f $(OBJECTS) $(P)
