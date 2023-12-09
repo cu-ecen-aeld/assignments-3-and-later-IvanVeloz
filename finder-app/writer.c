@@ -186,7 +186,7 @@ int mk_dir_r(const char *path) {
 
     for(int i=0; i<254; i++) {
         strcpy(parent, path);
-        dir = open(dirname(parent),__O_DIRECTORY);
+        dir = open(dirname(parent),O_DIRECTORY);
         if(dir != -1){
             // success!
             close(dir);
@@ -213,7 +213,7 @@ int mk_dir_r(const char *path) {
                 }      
             }
             else {
-                err_context = "open(parent,__O_DIRECTORY)";
+                err_context = "open(parent,O_DIRECTORY)";
                 goto ErrorCleanup;
             }
         }
