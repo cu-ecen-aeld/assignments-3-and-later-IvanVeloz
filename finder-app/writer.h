@@ -5,9 +5,9 @@
 int main(int argc, char *argv[]);
 int validate_args(int argc);
 int open_file(char *path);
-inline int close_file(int desc);
+static inline int close_file(int desc);
 int touch_file(void);
-inline int mk_dir(const char *path);
+static inline int mk_dir(const char *path);
 int mk_dir_r(const char *path);
 int print_args(int argc, char *argv[]);
 
