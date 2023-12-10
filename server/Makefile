@@ -25,7 +25,7 @@ OBJECTS= $(SOURCES:.c=.o)
 all: $(P)
 
 $(P).o: $(P).c
-	$(CC) $(CCFLAGS) -std=c11 -D_POSIX_C_SOURCE=200809L -c $(SOURCES)
+	$(CC) $(CCFLAGS) -Wall -std=c11 -D_POSIX_C_SOURCE=200809L -c $(SOURCES)
 
 $(P): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $(P)
