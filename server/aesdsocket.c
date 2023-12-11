@@ -266,16 +266,19 @@ int appenddata(int sfd, int dfd) {
         readcount = read(sfd, buf, buf_len);
         if (readcount == -1) {
             log_errno("appenddata(): read()");
+            free(buf);
             return -1;
         }
         else if (readcount == 0) {
             // End of file. In TCP terms, received FIN from client.
             syslog(LOG_DEBUG,"appenddata received FIN from client");
+            free(buf);
             return 0;
         }
         writecount = write(dfd,buf,readcount);
         if(writecount == -1) {
             log_errno("appenddata(): write()");
+            free(buf);
             return -1;
         }
         else if(writecount < readcount) {
@@ -284,6 +287,7 @@ int appenddata(int sfd, int dfd) {
         }
     }
         syslog(LOG_DEBUG,"appenddata done");
+        free(buf);
         return 0;
 }
 
@@ -305,7 +309,7 @@ int deletedatafile() {
 
 int robustclose(int fd) {
     if (close(fd) == 0) {
-                syslog(LOG_DEBUG,"Closed file descriptor %i", fd);
+                syslog(LOG_DEBUG,"Closed file descriptor #%i", fd);
                 return 0;
             }
     else{
