@@ -34,8 +34,9 @@ const struct socket_params aesd_netparams  = {
 int socketfiledesc = -1;
 int datafiledesc = -1;
 
-bool flag_accepting_connections = false;
-bool flag_idling_main_thread = false;
+volatile bool flag_accepting_connections = false;
+volatile bool flag_idling_main_thread = false;
+volatile int  last_signal_caught = 0;
 
 const char datapath[PATH_MAX] = "/var/tmp/aesdsocketdata";
 
@@ -53,7 +54,7 @@ struct filedesc_t {
 };
 
 int main(int argc, char *argv[]);
-int startserver();
+int startserver(bool daemonize);
 int stopserver();
 int opensocket();
 int closesocket(int sfd);
@@ -68,4 +69,4 @@ int deletedatafile();
 int robustclose(int fd);
 void log_errno(const char *funcname);
 void log_gai(const char *funcname, int errcode);
-void sigint_handler(int signo);
+static void signal_handler(int signo);

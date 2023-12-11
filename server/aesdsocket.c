@@ -32,8 +32,15 @@
  */
 
 int main(int argc, char *argv[]) {
+    bool daemonize = false;
+    if(argc == 2) {
+        if(strcmp(argv[1],"-d") == 0) {
+            daemonize = true;
+        }
+    }
+
     int r;
-    r = startserver();  // opens syslog, socket, file
+    r = startserver(daemonize);  // opens syslog, socket, file
     if(r) {return r;}
 
     pthread_t thread;
@@ -42,13 +49,14 @@ int main(int argc, char *argv[]) {
     startacceptconnectionthread(&thread, &mutex, socketfiledesc, datafiledesc);
     syslog(LOG_DEBUG,"ordered start of acceptconnectionthread");
     flag_idling_main_thread = true;
-    while(flag_idling_main_thread){pause();} // TODO: listen for signals
+    while(flag_idling_main_thread){pause();}
+    syslog(LOG_INFO, "caught %s signal",strsignal(last_signal_caught));
     pthread_cancel(thread);
     r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
 }
 
-int startserver() {
+int startserver(bool daemonize) {
     openlog("aesdsocket", LOG_CONS|LOG_PERROR|LOG_PID, LOG_USER);
     syslog(LOG_DEBUG, "creating data file %s", datapath);
     int r = createdatafile();
@@ -73,8 +81,31 @@ int startserver() {
         return 1;
     }
     socketfiledesc = sfd;
+
+    if(daemonize) {
+        syslog(LOG_DEBUG,"Starting daemon");
+        pid_t pid;
+        pid = fork();
+        if (pid < 0) {
+            log_errno("main(): fork");
+            return 1;
+        }
+        else if(pid > 0) {
+            syslog(LOG_INFO,"Daemon PID: %ld",(long)pid);
+            exit(EXIT_SUCCESS);
+        }
+    }
     
-    // TODO: start SIGINT and SIGTERM signal handlers here
+    struct sigaction signal_action;
+    memset(&signal_action,0,sizeof(struct sigaction));
+    signal_action.sa_handler = signal_handler;
+    r  =  sigaction(SIGINT, &signal_action, NULL);
+    r |= sigaction(SIGTERM, &signal_action, NULL);
+    if(r) {
+        log_errno("main(): sigaction()");
+        return 1;
+    }
+
 
     syslog(LOG_INFO, "server started");
     return 0;
@@ -227,13 +258,14 @@ int acceptconnection(int sfd, int dfd) {
 }
 
 void *acceptconnectionthread(void *thread_param) {
-    syslog(LOG_DEBUG,"acceptconnectionthread is alive");
     struct descriptors_t *desc = (struct descriptors_t *)thread_param;
     pthread_mutex_lock(desc->mutex);
     int sfd = desc->sfd;
     int dfd = desc->dfd;
-    acceptconnection(sfd, dfd);   //it's nice getting out of pointer-land
     pthread_mutex_unlock(desc->mutex);
+    free(desc);
+    syslog(LOG_DEBUG,"acceptconnectionthread is alive");
+    acceptconnection(sfd, dfd);   //it's nice getting out of pointer-land
     return thread_param;
 }
 
@@ -251,10 +283,14 @@ int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int s
 
     // I am not going to set up a mutex for sfd_p because I only intent on 
     // accessing it on a single thread. If this ever changes, add a mutex.
+    pthread_mutex_lock(descriptors->mutex); //prevent descriptors from being freed
     if(pthread_create(thread, NULL, acceptconnectionthread, descriptors)) {
         perror("startacceptconnectionthread(): pthread_create()");
         return -1;
     }
+    pthread_mutex_unlock(descriptors->mutex); //now acceptconnectionthread can free it
+
+
     return 0;
 }
 
@@ -344,13 +380,13 @@ void log_gai(const char *funcname, int errcode) {
 }
 
 // TODO setup sigaction
-void sigint_handler(int signo) {
+static void signal_handler(int signo) {
     switch(signo) {
         case SIGTERM:
         case SIGINT:
-            if(flag_accepting_connections) {
-                flag_accepting_connections = false;
-                flag_idling_main_thread = false;
-            }
+            flag_accepting_connections = false;
+            flag_idling_main_thread = false;
+        default:
+            last_signal_caught = signo;
     }
 }
