@@ -43,15 +43,12 @@ int main(int argc, char *argv[]) {
     r = startserver(daemonize);  // opens syslog, socket, file
     if(r) {return r;}
 
-    pthread_t thread;
-    pthread_mutex_t mutex;
-    pthread_mutex_init(&mutex, NULL);
-    startacceptconnectionthread(&thread, &mutex, socketfiledesc, datafiledesc);
-    syslog(LOG_DEBUG,"ordered start of acceptconnectionthread");
+    
+
     flag_idling_main_thread = true;
     while(flag_idling_main_thread){pause();}
     syslog(LOG_INFO, "caught %s signal",strsignal(last_signal_caught));
-    pthread_cancel(thread);
+
     r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
 }
@@ -72,7 +69,6 @@ int startserver(bool daemonize) {
         log_errno("main(): opendatafile()");
         return 1;
     }
-    datafiledesc = dfd;
 
     syslog(LOG_DEBUG, "opening socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     int sfd = opensocket();
@@ -80,7 +76,6 @@ int startserver(bool daemonize) {
         log_errno("main(): opensocket()");
         return 1;
     }
-    socketfiledesc = sfd;
 
     if(daemonize) {
         syslog(LOG_DEBUG,"Starting daemon");
@@ -95,6 +90,17 @@ int startserver(bool daemonize) {
             exit(EXIT_SUCCESS);
         }
     }
+
+    server_descriptors = (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
+    server_descriptors->mutex = malloc(sizeof(pthread_mutex_t));
+    server_descriptors->dfd = dfd;
+    server_descriptors->sfd = sfd;
+    pthread_mutex_init(server_descriptors->mutex, NULL);
+    if(startacceptconnectionthread(&server_thread, server_descriptors)) {
+        log_errno("main(): startacceptconnectionthread()");
+        return 1;
+    }
+    syslog(LOG_DEBUG,"ordered start of acceptconnectionthread");
     
     struct sigaction signal_action;
     memset(&signal_action,0,sizeof(struct sigaction));
@@ -113,6 +119,12 @@ int startserver(bool daemonize) {
 
 int stopserver() {
     int r;
+    syslog(LOG_DEBUG, "stopping thread");
+    pthread_cancel(server_thread);
+    pthread_mutex_destroy(server_descriptors->mutex);
+    syslog(LOG_DEBUG, "freeing global mallocs");
+    free(server_descriptors->mutex);
+    free(server_descriptors);
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     r = closesocket(socketfiledesc);
     if(r) {return 1;}
@@ -212,11 +224,10 @@ int closedatafile(int fd) {
 
 // The proper way to use this is as a thread, because it has a blocking 
 // function.
-int acceptconnection(int sfd, int dfd) {
+int acceptconnection(int sfd, int dfd, pthread_mutex_t *sfdmutex) {
+    // we might need to use the mutex more
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
-    //struct filedesc_wrmutex_t *dfd_mutual;
-    //dfd_mutual = (struct filedesc_t *)malloc(sizeof(struct filedesc_t));
     while(flag_accepting_connections) {
         int rsfd;   //receiving socket-file-descriptor
         struct sockaddr_storage client_addr;
@@ -237,7 +248,7 @@ int acceptconnection(int sfd, int dfd) {
             syslog(LOG_DEBUG,"Opened new descriptor # %i",rsfd);
         #endif
 
-        if(appenddata(rsfd, dfd)) {
+        if(appenddata(rsfd, dfd, sfdmutex)) {
             log_errno("acceptconnection(): appenddata()");
             if (robustclose(rsfd) == 0) {
                 syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
@@ -262,69 +273,80 @@ void *acceptconnectionthread(void *thread_param) {
     pthread_mutex_lock(desc->mutex);
     int sfd = desc->sfd;
     int dfd = desc->dfd;
+    pthread_mutex_t *dfd_mutex = desc->mutex;
     pthread_mutex_unlock(desc->mutex);
     free(desc);
     syslog(LOG_DEBUG,"acceptconnectionthread is alive");
-    acceptconnection(sfd, dfd);   //it's nice getting out of pointer-land
+    acceptconnection(sfd, dfd, dfd_mutex);   //it's nice getting out of pointer-land, mostly
     return thread_param;
 }
 
-int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int sfd, int dfd) {
-    syslog(LOG_DEBUG, "startacceptconnectionthread sfd = %i; dfd = %i",sfd,dfd);
-    struct descriptors_t *descriptors;
-    descriptors = (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
-    if(descriptors == NULL) {
+int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descriptors) {
+    syslog(LOG_DEBUG, "startacceptconnectionthread sfd = %i; dfd = %i",server_descriptors->sfd,server_descriptors->dfd);
+    if(server_descriptors == NULL) {
         perror("startacceptconnectionthread(): malloc()");
         return -1;
     }
-    descriptors->mutex = mutex;
-    descriptors->sfd = sfd;
-    descriptors->dfd = dfd;
-
-    // I am not going to set up a mutex for sfd_p because I only intent on 
-    // accessing it on a single thread. If this ever changes, add a mutex.
-    pthread_mutex_lock(descriptors->mutex); //prevent descriptors from being freed
     if(pthread_create(thread, NULL, acceptconnectionthread, descriptors)) {
         perror("startacceptconnectionthread(): pthread_create()");
         return -1;
     }
-    pthread_mutex_unlock(descriptors->mutex); //now acceptconnectionthread can free it
-
-
     return 0;
 }
 
-int appenddata(int sfd, int dfd) {
+int appenddata(int rsfd, int dfd, pthread_mutex_t *sfdmutex) {
     int buf_len = 10000;  //arbitrary
     void *buf = malloc(buf_len);
     size_t readcount, writecount;
     while(1) {
-        readcount = read(sfd, buf, buf_len);
+        readcount = read(rsfd, buf, buf_len);
         if (readcount == -1) {
             log_errno("appenddata(): read()");
-            free(buf);
-            return -1;
+            goto errorcleanup;
         }
         else if (readcount == 0) {
             // End of file. In TCP terms, received FIN from client.
             syslog(LOG_DEBUG,"appenddata received FIN from client");
-            free(buf);
-            return 0;
+            goto done;
         }
-        writecount = write(dfd,buf,readcount);
+        writecount = write(dfd, buf, readcount);
         if(writecount == -1) {
             log_errno("appenddata(): write()");
-            free(buf);
-            return -1;
+            goto errorcleanup;
         }
         else if(writecount < readcount) {
             syslog(LOG_WARNING, "appenddata(): write(): %m ...Continuing");
             syslog(LOG_WARNING, "caused by writecount < readcount... continuing.");
         }
     }
-        syslog(LOG_DEBUG,"appenddata done");
+        done:
+        syslog(LOG_DEBUG,"appenddata done; sending data back");
+        do {
+            readcount = read(dfd, buf, buf_len);
+            if (readcount == -1) {
+                log_errno("appenddata(): socket read()");
+                goto errorcleanup;
+            }
+            writecount = write(rsfd, buf, buf_len);
+            if(writecount == -1) {
+                log_errno("appenddata(): write()");
+                goto errorcleanup;
+            }
+        } while(readcount > 0 && readcount != -1);
+        if(readcount == -1) {
+            log_errno("appenddata(): file read()");
+            goto errorcleanup;
+        }
+        else if(writecount < readcount) {
+            syslog(LOG_WARNING, "appenddata(): socket write(): %m ...Continuing");
+            syslog(LOG_WARNING, "caused by writecount < readcount... continuing.");
+        }
         free(buf);
         return 0;
+
+        errorcleanup:
+        free(buf);
+        return -1;
 }
 
 int createdatafile() {
