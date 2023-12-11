@@ -19,16 +19,18 @@
 
 #include "aesdsocket.h"
 
-/* TODO:
- *  b. Opens a stream socket bound to port 9000, failing and returning -1 if 
- *     any of the socket connection steps fail.
- *  c. Listens for and accepts a connection
- *  d. Logs message to the syslog “Accepted connection from xxx” where XXXX 
- *     is the IP address of the connected client.
- *  e. Receives data over the connection and appends to file 
- *     /var/tmp/aesdsocketdata, creating this file if it doesn’t exist.
- * 
- *  Read the data line by line; don't load the entire file onto memory.
+/* Comments:
+ *  This server launches a thread dedicated to listening on the passive
+ *  socket bound to 0.0.0.0:9000.
+ *
+ *  The server could be made to handle multuple connections simultaneously if
+ *  appenddata() is wrapped around a thread (use the mutex to lock fdf). This
+ *  is why mutex types exist around the program. In the end they weren´t
+ *  necessary. As it is, the server handles connections sequentially.
+ *
+ *  The parent thread is free to do anything. There is a while(true) loop
+ *  in main that sleeps until it gets a SIGINT or SIGTERM.
+ *  
  */
 
 int main(int argc, char *argv[]) {
