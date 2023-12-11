@@ -217,7 +217,7 @@ int acceptconnection(int sfd, int dfd) {
                 return -1;
             }
         }
-        close(rsfd);
+        robustclose(rsfd);
         #ifdef __DEBUG_MESSAGES
         syslog(LOG_DEBUG,"Closed file descriptor #%i",rsfd);
         syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
