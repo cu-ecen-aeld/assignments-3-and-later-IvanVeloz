@@ -246,7 +246,7 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *sfdmutex) {
             if (getnameinfo((struct sockaddr *)&client_addr, client_addr_len,
                             hoststr, sizeof(hoststr), portstr, sizeof(portstr),
                             NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-                syslog(LOG_DEBUG,"Incoming connection from %s port %s", hoststr, portstr);
+                syslog(LOG_INFO,"Incoming connection from %s port %s", hoststr, portstr);
             }
             syslog(LOG_DEBUG,"Opened new descriptor # %i",rsfd);
         #endif
@@ -254,7 +254,7 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *sfdmutex) {
         if(appenddata(rsfd, dfd, sfdmutex)) {
             log_errno("acceptconnection(): appenddata()");
             if (robustclose(rsfd) == 0) {
-                syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
+                syslog(LOG_INFO,"Closed connection from %s port %s", hoststr, portstr);
                 return 0;
             }
             else {
@@ -265,7 +265,7 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *sfdmutex) {
         robustclose(rsfd);
         #ifdef __DEBUG_MESSAGES
         syslog(LOG_DEBUG,"Closed file descriptor #%i",rsfd);
-        syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
+        syslog(LOG_INFO,"Closed connection from %s port %s", hoststr, portstr);
         #endif
     }
     return 0;
