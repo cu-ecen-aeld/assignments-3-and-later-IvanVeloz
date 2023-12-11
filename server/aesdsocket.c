@@ -122,18 +122,18 @@ int stopserver() {
     syslog(LOG_DEBUG, "stopping thread");
     pthread_cancel(server_thread);
     pthread_mutex_destroy(server_descriptors->mutex);
-    syslog(LOG_DEBUG, "freeing global mallocs");
-    free(server_descriptors->mutex);
-    free(server_descriptors);
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
-    r = closesocket(socketfiledesc);
+    r = closesocket(server_descriptors->sfd);
     if(r) {return 1;}
     syslog(LOG_DEBUG, "closing data file %s", datapath);
-    closedatafile(datafiledesc);
+    closedatafile(server_descriptors->dfd);
     if(r) {return 1;}
     syslog(LOG_DEBUG, "deleting data file %s", datapath);
     deletedatafile();
     if(r) {return 1;}
+    syslog(LOG_DEBUG, "freeing global mallocs");
+    free(server_descriptors->mutex);
+    free(server_descriptors);
     syslog(LOG_DEBUG, "server stopped");
     closelog();
     return 0;
@@ -199,6 +199,9 @@ int opensocket() {
 }
 
 int closesocket(int sfd) {
+    if (shutdown(sfd,2)) {
+        log_errno("closesocket(): shutdown() (continuing)");
+    }
     if ( robustclose(sfd) ) {
         log_errno("closesocket(): close()");
         return -1;
@@ -207,7 +210,7 @@ int closesocket(int sfd) {
 }
 
 int opendatafile() {
-    int fd = open(datapath,O_APPEND|O_CREAT|O_WRONLY|O_TRUNC);
+    int fd = open(datapath,O_APPEND|O_CREAT|O_RDWR|O_TRUNC);
     if(fd == -1) {
         log_errno("opendatafile(): open()");
     }
@@ -275,7 +278,6 @@ void *acceptconnectionthread(void *thread_param) {
     int dfd = desc->dfd;
     pthread_mutex_t *dfd_mutex = desc->mutex;
     pthread_mutex_unlock(desc->mutex);
-    free(desc);
     syslog(LOG_DEBUG,"acceptconnectionthread is alive");
     acceptconnection(sfd, dfd, dfd_mutex);   //it's nice getting out of pointer-land, mostly
     return thread_param;
@@ -296,57 +298,77 @@ int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descrip
 
 int appenddata(int rsfd, int dfd, pthread_mutex_t *sfdmutex) {
     int buf_len = 10000;  //arbitrary
-    void *buf = malloc(buf_len);
+    void *buf = malloc(buf_len+1);
     size_t readcount, writecount;
-    while(1) {
+    //const char newline = '\n';
+    // Read read the socket and write into datafile
+    while(true) {
         readcount = read(rsfd, buf, buf_len);
         if (readcount == -1) {
-            log_errno("appenddata(): read()");
+            log_errno("appenddata(): socket read()");
             goto errorcleanup;
+        }
+        else if (readcount != 0) {
+            writecount = write(dfd, buf, readcount);
+            
+            if(writecount == -1) {
+                log_errno("appenddata(): data write()");
+                goto errorcleanup;
+            }
+            else if(writecount < readcount) {
+                syslog(LOG_ERR, "appenddata(): write(): %m");
+                syslog(LOG_ERR, "caused by writecount=%li < readcount=%li", (
+                        long unsigned) writecount, (long unsigned) readcount);
+                goto errorcleanup;
+            }
+            syslog(LOG_DEBUG,"readcount was %li",readcount);
+            if(readcount < buf_len) {
+            // Read all of the datafile and write into the socket
+                for(int pos=0,rc=-1; rc!=0; pos += rc) {
+                    int wc;
+                    rc = pread(dfd, buf, buf_len,pos);
+                    if (rc == -1) {
+                        log_errno("appenddata(): file read()");
+                        goto errorcleanup;
+                    }
+                    else if (rc != 0){
+                        wc = write(rsfd,buf,rc);
+                        //write(STDOUT_FILENO,buf,rc);
+                        //printf("rc = %i\n",pos);
+                        if(wc == -1) {
+                            log_errno("appenddata(): socket write()");
+                            goto errorcleanup;
+                        }
+                        else if(wc < rc) {
+                            syslog(LOG_ERR, "appenddata(): socket write(): %m");
+                            syslog(LOG_ERR, "caused by writecount=%li < readcount=%li", 
+                                    (long unsigned)wc, (long unsigned) rc);
+                            goto errorcleanup;
+                        }
+                    }
+                    else if (rc == 0) {
+                        syslog(LOG_DEBUG,"appenddata copied datafile to the socket");
+                        break;
+                    }
+                }
+            }  
         }
         else if (readcount == 0) {
-            // End of file. In TCP terms, received FIN from client.
+            /*if( write(dfd,(void *)&newline,1) != 1) {
+                log_errno("appenddata(): add newline");
+                goto errorcleanup;
+            }*/
             syslog(LOG_DEBUG,"appenddata received FIN from client");
-            goto done;
+            break;
         }
-        writecount = write(dfd, buf, readcount);
-        if(writecount == -1) {
-            log_errno("appenddata(): write()");
-            goto errorcleanup;
-        }
-        else if(writecount < readcount) {
-            syslog(LOG_WARNING, "appenddata(): write(): %m ...Continuing");
-            syslog(LOG_WARNING, "caused by writecount < readcount... continuing.");
-        }
-    }
-        done:
-        syslog(LOG_DEBUG,"appenddata done; sending data back");
-        do {
-            readcount = read(dfd, buf, buf_len);
-            if (readcount == -1) {
-                log_errno("appenddata(): socket read()");
-                goto errorcleanup;
-            }
-            writecount = write(rsfd, buf, buf_len);
-            if(writecount == -1) {
-                log_errno("appenddata(): write()");
-                goto errorcleanup;
-            }
-        } while(readcount > 0 && readcount != -1);
-        if(readcount == -1) {
-            log_errno("appenddata(): file read()");
-            goto errorcleanup;
-        }
-        else if(writecount < readcount) {
-            syslog(LOG_WARNING, "appenddata(): socket write(): %m ...Continuing");
-            syslog(LOG_WARNING, "caused by writecount < readcount... continuing.");
-        }
-        free(buf);
-        return 0;
+    } 
 
-        errorcleanup:
-        free(buf);
-        return -1;
+    free(buf);
+    return 0;
+
+    errorcleanup:
+    free(buf);
+    return -1;
 }
 
 int createdatafile() {

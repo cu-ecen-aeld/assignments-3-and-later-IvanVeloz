@@ -31,9 +31,6 @@ const struct socket_params aesd_netparams  = {
 };
 // To bind to a specific interface use .ip = "127.0.0.1" for example.
 
-int socketfiledesc = -1;
-int datafiledesc = -1;
-
 volatile bool flag_accepting_connections = false;
 volatile bool flag_idling_main_thread = false;
 volatile int  last_signal_caught = 0;
