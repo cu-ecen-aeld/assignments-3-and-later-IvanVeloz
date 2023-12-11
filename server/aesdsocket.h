@@ -45,6 +45,13 @@ struct descriptors_t {
     int sfd;                // socket file descriptor
 };
 
+struct filedesc_t {
+    pthread_mutex_t *dfdmutex;   // data file mutex
+    pthread_mutex_t *sfdmutex;   // socket file mutex
+    int *dfd;
+    int *sfd;
+};
+
 int main(int argc, char *argv[]);
 int startserver();
 int stopserver();
@@ -55,9 +62,10 @@ int closedatafile(int fd);
 int acceptconnection(int sfd, int dfd);
 void *acceptconnectionthread(void *thread_param);
 int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int sfd, int dfd);
-int appenddata(int sfd);
+int appenddata(int sfd, int dfd);
 int createdatafile();
 int deletedatafile();
+int robustclose(int fd);
 void log_errno(const char *funcname);
 void log_gai(const char *funcname, int errcode);
 void sigint_handler(int signo);

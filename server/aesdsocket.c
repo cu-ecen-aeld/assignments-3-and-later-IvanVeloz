@@ -44,8 +44,6 @@ int main(int argc, char *argv[]) {
     flag_idling_main_thread = true;
     while(flag_idling_main_thread){pause();} // TODO: listen for signals
     pthread_cancel(thread);
-    //TODO: check if potentially we need to change the thread's disable the
-    // thread's cancelability during some operation.
     r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
 }
@@ -151,14 +149,14 @@ int opensocket() {
 
     errorcleanup:
     errnoshadow = errno;
-    close(sfd);
+    robustclose(sfd);
     freeaddrinfo(bindaddresses);
     errno = errnoshadow;
     return -1;
 }
 
 int closesocket(int sfd) {
-    if ( close(sfd) ) {
+    if ( robustclose(sfd) ) {
         log_errno("closesocket(): close()");
         return -1;
     }
@@ -166,7 +164,7 @@ int closesocket(int sfd) {
 }
 
 int opendatafile() {
-    int fd = open(datapath,O_APPEND);
+    int fd = open(datapath,O_APPEND|O_CREAT|O_WRONLY|O_TRUNC);
     if(fd == -1) {
         log_errno("opendatafile(): open()");
     }
@@ -174,7 +172,7 @@ int opendatafile() {
 }
 
 int closedatafile(int fd) {
-    if(close(fd)) {
+    if(robustclose(fd)) {
         log_errno("closedatafile(): close()");
         return -1;
     }
@@ -186,6 +184,8 @@ int closedatafile(int fd) {
 int acceptconnection(int sfd, int dfd) {
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
+    //struct filedesc_wrmutex_t *dfd_mutual;
+    //dfd_mutual = (struct filedesc_t *)malloc(sizeof(struct filedesc_t));
     while(flag_accepting_connections) {
         int rsfd;   //receiving socket-file-descriptor
         struct sockaddr_storage client_addr;
@@ -205,8 +205,23 @@ int acceptconnection(int sfd, int dfd) {
             }
             syslog(LOG_DEBUG,"Opened new descriptor # %i",rsfd);
         #endif
-        // TODO: read socket data
-        // TODO: write to file descriptor
+
+        if(appenddata(rsfd, dfd)) {
+            log_errno("acceptconnection(): appenddata()");
+            if (robustclose(rsfd) == 0) {
+                syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
+                return 0;
+            }
+            else {
+                syslog(LOG_ERR,"failed to close fd %i", rsfd);
+                return -1;
+            }
+        }
+        close(rsfd);
+        #ifdef __DEBUG_MESSAGES
+        syslog(LOG_DEBUG,"Closed file descriptor #%i",rsfd);
+        syslog(LOG_DEBUG,"Closed connection from %s port %s", hoststr, portstr);
+        #endif
     }
     return 0;
 }
@@ -243,8 +258,33 @@ int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int s
     return 0;
 }
 
-int appenddata(int sfd) {
-    return -1;
+int appenddata(int sfd, int dfd) {
+    int buf_len = 10000;  //arbitrary
+    void *buf = malloc(buf_len);
+    size_t readcount, writecount;
+    while(1) {
+        readcount = read(sfd, buf, buf_len);
+        if (readcount == -1) {
+            log_errno("appenddata(): read()");
+            return -1;
+        }
+        else if (readcount == 0) {
+            // End of file. In TCP terms, received FIN from client.
+            syslog(LOG_DEBUG,"appenddata received FIN from client");
+            return 0;
+        }
+        writecount = write(dfd,buf,readcount);
+        if(writecount == -1) {
+            log_errno("appenddata(): write()");
+            return -1;
+        }
+        else if(writecount < readcount) {
+            syslog(LOG_WARNING, "appenddata(): write(): %m ...Continuing");
+            syslog(LOG_WARNING, "caused by writecount < readcount... continuing.");
+        }
+    }
+        syslog(LOG_DEBUG,"appenddata done");
+        return 0;
 }
 
 int createdatafile() {
@@ -263,7 +303,32 @@ int deletedatafile() {
     return system(cmd);
 }
 
+int robustclose(int fd) {
+    if (close(fd) == 0) {
+                syslog(LOG_DEBUG,"Closed file descriptor %i", fd);
+                return 0;
+            }
+    else{
+        if(errno == EINTR) {
+            int i, r;
+            for(i = 0; i>5 || r == 0 || errno != EINTR; i++) {
+                r = close(fd);
+            }
+            if (r != 0) {
+                syslog(LOG_ERR,"robustclose() failed to close file descriptor %i after %i retries: %m",fd,i);
+                return -1;
+            } 
+        }
+        else {
+            syslog(LOG_ERR,"robustclose() failed to close file descriptor %i",fd);
+            return -1;
+        }
+    }
+    return -1;
+}
+
 void log_errno(const char *funcname) {
+    // I
     int local_errno = errno;
     syslog(LOG_ERR, "%s: %m", funcname);
     errno = local_errno;
