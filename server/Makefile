@@ -31,7 +31,7 @@ $(P).o: $(P).c
 	$(CC) $(CCFLAGS) -Wall -std=c11 -D_POSIX_C_SOURCE=200809L -c $(SOURCES)
 
 $(P): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $(P)
+	$(CC) $(LDFLAGS) -lpthread -pthread $(OBJECTS) -o $(P)
 
 clean:
 	rm -f $(OBJECTS) $(P)

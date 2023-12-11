@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <syslog.h>
+#include <pthread.h>
 
 #include "aesdsocket.h"
 
@@ -32,10 +33,20 @@
 
 int main(int argc, char *argv[]) {
     int r;
-    r = startserver();
+    r = startserver();  // opens syslog, socket, file
     if(r) {return r;}
-    //acceptconnection(socketfiledesc);  // should be on its own thread
-    r = stopserver();
+
+    pthread_t thread;
+    pthread_mutex_t mutex;
+    pthread_mutex_init(&mutex, NULL);
+    startacceptconnectionthread(&thread, &mutex, socketfiledesc, datafiledesc);
+    syslog(LOG_DEBUG,"ordered start of acceptconnectionthread");
+    flag_idling_main_thread = true;
+    while(flag_idling_main_thread){pause();} // TODO: listen for signals
+    pthread_cancel(thread);
+    //TODO: check if potentially we need to change the thread's disable the
+    // thread's cancelability during some operation.
+    r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
 }
 
@@ -172,14 +183,18 @@ int closedatafile(int fd) {
 
 // The proper way to use this is as a thread, because it has a blocking 
 // function.
-int acceptconnection(int sfd) {
+int acceptconnection(int sfd, int dfd) {
+    syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
     while(flag_accepting_connections) {
         int rsfd;   //receiving socket-file-descriptor
         struct sockaddr_storage client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
         rsfd = accept(sfd,(struct sockaddr *)&client_addr,&client_addr_len);
-
+        if(rsfd == -1) {
+            log_errno("acceptconnection(): accept()");
+            return -1;
+        }
         #ifdef __DEBUG_MESSAGES
             char hoststr[NI_MAXHOST];
             char portstr[NI_MAXSERV];
@@ -190,7 +205,40 @@ int acceptconnection(int sfd) {
             }
             syslog(LOG_DEBUG,"Opened new descriptor # %i",rsfd);
         #endif
-        
+        // TODO: read socket data
+        // TODO: write to file descriptor
+    }
+    return 0;
+}
+
+void *acceptconnectionthread(void *thread_param) {
+    syslog(LOG_DEBUG,"acceptconnectionthread is alive");
+    struct descriptors_t *desc = (struct descriptors_t *)thread_param;
+    pthread_mutex_lock(desc->mutex);
+    int sfd = desc->sfd;
+    int dfd = desc->dfd;
+    acceptconnection(sfd, dfd);   //it's nice getting out of pointer-land
+    pthread_mutex_unlock(desc->mutex);
+    return thread_param;
+}
+
+int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int sfd, int dfd) {
+    syslog(LOG_DEBUG, "startacceptconnectionthread sfd = %i; dfd = %i",sfd,dfd);
+    struct descriptors_t *descriptors;
+    descriptors = (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
+    if(descriptors == NULL) {
+        perror("startacceptconnectionthread(): malloc()");
+        return -1;
+    }
+    descriptors->mutex = mutex;
+    descriptors->sfd = sfd;
+    descriptors->dfd = dfd;
+
+    // I am not going to set up a mutex for sfd_p because I only intent on 
+    // accessing it on a single thread. If this ever changes, add a mutex.
+    if(pthread_create(thread, NULL, acceptconnectionthread, descriptors)) {
+        perror("startacceptconnectionthread(): pthread_create()");
+        return -1;
     }
     return 0;
 }
@@ -229,8 +277,11 @@ void log_gai(const char *funcname, int errcode) {
 // TODO setup sigaction
 void sigint_handler(int signo) {
     switch(signo) {
+        case SIGTERM:
         case SIGINT:
-            if(flag_accepting_connections)
+            if(flag_accepting_connections) {
                 flag_accepting_connections = false;
+                flag_idling_main_thread = false;
+            }
     }
 }

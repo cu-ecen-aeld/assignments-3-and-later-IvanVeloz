@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <linux/limits.h>
+#include <pthread.h>
 
 struct socket_params {
     char *port;
@@ -34,9 +35,15 @@ int socketfiledesc = -1;
 int datafiledesc = -1;
 
 bool flag_accepting_connections = false;
+bool flag_idling_main_thread = false;
 
 const char datapath[PATH_MAX] = "/var/tmp/aesdsocketdata";
 
+struct descriptors_t {
+    pthread_mutex_t *mutex;
+    int dfd;                // data file descriptor
+    int sfd;                // socket file descriptor
+};
 
 int main(int argc, char *argv[]);
 int startserver();
@@ -45,7 +52,9 @@ int opensocket();
 int closesocket(int sfd);
 int opendatafile();
 int closedatafile(int fd);
-int acceptconnection(int sfd);
+int acceptconnection(int sfd, int dfd);
+void *acceptconnectionthread(void *thread_param);
+int startacceptconnectionthread(pthread_t *thread, pthread_mutex_t *mutex, int sfd, int dfd);
 int appenddata(int sfd);
 int createdatafile();
 int deletedatafile();
