@@ -47,7 +47,9 @@ int main(int argc, char *argv[]) {
 
     flag_idling_main_thread = true;
     while(flag_idling_main_thread){pause();}
-    syslog(LOG_INFO, "caught %s signal",strsignal(last_signal_caught));
+    syslog(LOG_INFO, "Caught signal, exiting",strsignal(last_signal_caught));
+    syslog(LOG_DEBUG, "Caught %s signal",strsignal(last_signal_caught));
+
 
     r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
