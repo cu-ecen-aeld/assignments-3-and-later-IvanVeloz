@@ -2,6 +2,8 @@
 #define __DEBUG_MESSAGES 1
 
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -27,16 +29,29 @@
  */
 
 int main(int argc, char *argv[]) {
+
     openlog("aesdsocket", LOG_CONS|LOG_PERROR|LOG_PID, LOG_USER);
     syslog(LOG_DEBUG, "server started");
+
+    syslog(LOG_DEBUG, "creating data file %s", datapath);
+    int r = initializedatafile();
+    if(r) {
+        log_errno("main(): initializedatafile()");
+        syslog(LOG_ERR, "the return value was %i", r);
+        return 1;
+    }
+
     int sfd = opensocket();
     if( sfd == -1 ) {
         log_errno("main(): opensocket()");
         return 1;
     }
     socketfiledesc = sfd;
+
     // start SIGINT and SIGTERM signal handlers here
+
     acceptconnection(socketfiledesc);  // should be on its own thread
+
     closesocket(socketfiledesc);
     syslog(LOG_DEBUG, "server stopped");
     closelog();
@@ -110,6 +125,14 @@ int closesocket(int sfd) {
     return 0;
 }
 
+int opendatafile() {
+
+}
+
+int closedatafile(int fd) {
+
+}
+
 // The proper way to use this is as a thread, because it has a blocking 
 // function.
 int acceptconnection(int sfd) {
@@ -133,6 +156,17 @@ int acceptconnection(int sfd) {
         
     }
     return 0;
+}
+
+int appenddata(int sfd) {
+    return -1;
+}
+
+int initializedatafile() {
+    const char *cmdfmt = "mkdir -p $(dirname %s); touch %s";
+    char cmd[PATH_MAX*2 + sizeof(cmdfmt) + 1];
+    sprintf(cmd, cmdfmt, datapath, datapath);
+    return system(cmd);
 }
 
 void log_errno(const char *funcname) {

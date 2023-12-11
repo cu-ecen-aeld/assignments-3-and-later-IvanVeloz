@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <linux/limits.h>
 
 struct socket_params {
     char *port;
@@ -33,10 +34,17 @@ int socketfiledesc = -1;
 
 bool flag_accepting_connections = false;
 
+const char datapath[PATH_MAX] = "/var/tmp/aesdsocketdata";
+
+
 int main(int argc, char *argv[]);
 int opensocket();
 int closesocket(int sfd);
+int opendatafile();
+int closedatafile(int fd);
 int acceptconnection(int sfd);
+int appenddata(int sfd);
+int initializedatafile();
 void log_errno(const char *funcname);
 void log_gai(const char *funcname, int errcode);
 void sigint_handler(int signo);
