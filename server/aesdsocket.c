@@ -1,17 +1,19 @@
 #define _POSIX_C_SOURCE 200809L
 #define __DEBUG_MESSAGES 1
 
+#include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
 #include <signal.h>
-#include <string.h>
 #include <syslog.h>
 
 #include "aesdsocket.h"
@@ -31,16 +33,24 @@
 int main(int argc, char *argv[]) {
 
     openlog("aesdsocket", LOG_CONS|LOG_PERROR|LOG_PID, LOG_USER);
-    syslog(LOG_DEBUG, "server started");
 
     syslog(LOG_DEBUG, "creating data file %s", datapath);
-    int r = initializedatafile();
+    int r = createdatafile();
     if(r) {
         log_errno("main(): initializedatafile()");
         syslog(LOG_ERR, "the return value was %i", r);
         return 1;
     }
 
+    syslog(LOG_DEBUG, "opening data file %s", datapath);
+    int dfd = opendatafile();
+    if( dfd == -1 ) {
+        log_errno("main(): opendatafile()");
+        return 1;
+    }
+    datafiledesc = dfd;
+
+    syslog(LOG_DEBUG, "opening socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     int sfd = opensocket();
     if( sfd == -1 ) {
         log_errno("main(): opensocket()");
@@ -50,9 +60,16 @@ int main(int argc, char *argv[]) {
 
     // start SIGINT and SIGTERM signal handlers here
 
+    syslog(LOG_INFO, "server started");
+    
     acceptconnection(socketfiledesc);  // should be on its own thread
 
+    syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     closesocket(socketfiledesc);
+    syslog(LOG_DEBUG, "closing data file %s", datapath);
+    closedatafile(datafiledesc);
+    syslog(LOG_DEBUG, "deleting data file %s", datapath);
+    deletedatafile();
     syslog(LOG_DEBUG, "server stopped");
     closelog();
     return 0;
@@ -126,11 +143,19 @@ int closesocket(int sfd) {
 }
 
 int opendatafile() {
-
+    int fd = open(datapath,O_APPEND);
+    if(fd == -1) {
+        log_errno("opendatafile(): open()");
+    }
+    return fd;
 }
 
 int closedatafile(int fd) {
-
+    if(close(fd)) {
+        log_errno("closedatafile(): close()");
+        return -1;
+    }
+    return 0;
 }
 
 // The proper way to use this is as a thread, because it has a blocking 
@@ -162,10 +187,19 @@ int appenddata(int sfd) {
     return -1;
 }
 
-int initializedatafile() {
-    const char *cmdfmt = "mkdir -p $(dirname %s); touch %s";
+int createdatafile() {
+    const char cmdfmt[] = "mkdir -p $(dirname %s); touch %s";
     char cmd[PATH_MAX*2 + sizeof(cmdfmt) + 1];
+    //2 chars longer than necessary for every %s
     sprintf(cmd, cmdfmt, datapath, datapath);
+    return system(cmd);
+}
+
+int deletedatafile() {
+    const char cmdfmt[] = "rm %s";
+    char cmd[PATH_MAX + sizeof(cmdfmt)]; 
+    //2 chars longer than necessary for every %s
+    sprintf(cmd, cmdfmt, datapath);
     return system(cmd);
 }
 

@@ -31,6 +31,7 @@ const struct socket_params aesd_netparams  = {
 // To bind to a specific interface use .ip = "127.0.0.1" for example.
 
 int socketfiledesc = -1;
+int datafiledesc = -1;
 
 bool flag_accepting_connections = false;
 
@@ -44,7 +45,8 @@ int opendatafile();
 int closedatafile(int fd);
 int acceptconnection(int sfd);
 int appenddata(int sfd);
-int initializedatafile();
+int createdatafile();
+int deletedatafile();
 void log_errno(const char *funcname);
 void log_gai(const char *funcname, int errcode);
 void sigint_handler(int signo);
