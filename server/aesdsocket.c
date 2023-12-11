@@ -297,10 +297,9 @@ int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descrip
 }
 
 int appenddata(int rsfd, int dfd, pthread_mutex_t *sfdmutex) {
-    int buf_len = 10000;  //arbitrary
+    int buf_len = 1024;  //arbitrary
     void *buf = malloc(buf_len+1);
     size_t readcount, writecount;
-    //const char newline = '\n';
     // Read read the socket and write into datafile
     while(true) {
         readcount = read(rsfd, buf, buf_len);
@@ -321,7 +320,7 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *sfdmutex) {
                         long unsigned) writecount, (long unsigned) readcount);
                 goto errorcleanup;
             }
-            syslog(LOG_DEBUG,"readcount was %li",readcount);
+            //syslog(LOG_DEBUG,"readcount was %li",readcount);
             if(readcount < buf_len) {
             // Read all of the datafile and write into the socket
                 for(int pos=0,rc=-1; rc!=0; pos += rc) {
@@ -412,7 +411,6 @@ int robustclose(int fd) {
 }
 
 void log_errno(const char *funcname) {
-    // I
     int local_errno = errno;
     syslog(LOG_ERR, "%s: %m", funcname);
     errno = local_errno;
