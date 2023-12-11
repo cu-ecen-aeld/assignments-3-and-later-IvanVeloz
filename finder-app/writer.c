@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
  */
 int validate_args(int argc) {
     if (argc != 3 ) {
-        printf("Usage: writer.sh [filepath] [textstring]\n");
+        printf("Usage: writer [filepath] [textstring]\n");
         printf("Example invocation: writer.sh /tmp/aesd/assignment1/sample.txt ios\n");
         return 1;
     }
