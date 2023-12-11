@@ -39,6 +39,8 @@ const char datapath[PATH_MAX] = "/var/tmp/aesdsocketdata";
 
 
 int main(int argc, char *argv[]);
+int startserver();
+int stopserver();
 int opensocket();
 int closesocket(int sfd);
 int opendatafile();

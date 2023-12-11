@@ -31,9 +31,16 @@
  */
 
 int main(int argc, char *argv[]) {
+    int r;
+    r = startserver();
+    if(r) {return r;}
+    //acceptconnection(socketfiledesc);  // should be on its own thread
+    r = stopserver();
+    return r;
+}
 
+int startserver() {
     openlog("aesdsocket", LOG_CONS|LOG_PERROR|LOG_PID, LOG_USER);
-
     syslog(LOG_DEBUG, "creating data file %s", datapath);
     int r = createdatafile();
     if(r) {
@@ -57,19 +64,24 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     socketfiledesc = sfd;
-
-    // start SIGINT and SIGTERM signal handlers here
+    
+    // TODO: start SIGINT and SIGTERM signal handlers here
 
     syslog(LOG_INFO, "server started");
-    
-    acceptconnection(socketfiledesc);  // should be on its own thread
+    return 0;
+}
 
+int stopserver() {
+    int r;
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
-    closesocket(socketfiledesc);
+    r = closesocket(socketfiledesc);
+    if(r) {return 1;}
     syslog(LOG_DEBUG, "closing data file %s", datapath);
     closedatafile(datafiledesc);
+    if(r) {return 1;}
     syslog(LOG_DEBUG, "deleting data file %s", datapath);
     deletedatafile();
+    if(r) {return 1;}
     syslog(LOG_DEBUG, "server stopped");
     closelog();
     return 0;
