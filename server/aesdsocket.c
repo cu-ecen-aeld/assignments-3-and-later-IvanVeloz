@@ -159,6 +159,7 @@ void *acceptconnectionthread(void *thread_param) {
 // The proper way to use this is as a thread, because it has a blocking 
 // function.
 int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
+    int r;
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
     while(flag_accepting_connections) {
@@ -178,19 +179,14 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
                             NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
                 syslog(LOG_INFO,"Incoming connection from %s port %s", hoststr, portstr);
             }
-            syslog(LOG_DEBUG,"Opened new descriptor # %i",rsfd);
+            syslog(LOG_DEBUG,"Opened new rsfd descriptor # %i",rsfd);
         #endif
-
-        if(appenddata(rsfd, dfd, dfdmutex)) {
+        // TODO: call appenddata on an independent thread and loop
+        r = appenddata(rsfd, dfd, dfdmutex);
+        if(r) {
             log_errno("acceptconnection(): appenddata()");
-            if (robustclose(rsfd) == 0) {
-                syslog(LOG_INFO,"Closed connection from %s port %s", hoststr, portstr);
-                return 0;
-            }
-            else {
-                syslog(LOG_ERR,"failed to close fd %i", rsfd);
-                return -1;
-            }
+            r = robustclose(rsfd);
+            return r;
         }
         robustclose(rsfd);
         #ifdef __DEBUG_MESSAGES
@@ -199,6 +195,7 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
         #endif
     }
     return 0;
+   
 }
 
 int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descriptors) {
