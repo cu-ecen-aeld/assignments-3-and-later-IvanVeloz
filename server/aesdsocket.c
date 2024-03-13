@@ -185,7 +185,7 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
         r = appenddata(rsfd, dfd, dfdmutex);
         if(r) {
             log_errno("acceptconnection(): appenddata()");
-            r = robustclose(rsfd);
+            robustclose(rsfd);
             return r;
         }
         robustclose(rsfd);
