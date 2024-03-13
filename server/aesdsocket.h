@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 #include <netdb.h>
 #include <linux/limits.h>
 #include <pthread.h>
@@ -52,6 +53,17 @@ struct filedesc_t {
     int *sfd;
 };
 
+// Passed to appenddata() threads. This data would be on a TAILQ list and each
+// list element is assigned to a thread.
+struct append_t {
+    pthread_mutex_t * const dfdmutex;   // Mutex for data file descriptor
+    int const dfd;                      // Data file descriptor
+    int const rsfd;                     // Socket file descriptor
+    int const thread;                   // Thread ID
+    int ret;                            // Return value
+    TAILQ_ENTRY(append_t) nodes;        // TAILQ nodes
+};
+
 int main(int argc, char *argv[]);
 int startserver(bool daemonize);
 int stopserver();
@@ -59,9 +71,10 @@ int opensocket();
 int closesocket(int sfd);
 int opendatafile();
 int closedatafile(int fd);
-int acceptconnection(int rsfd, int dfd, pthread_mutex_t *sfdmutex);
-void *acceptconnectionthread(void *thread_param);
-int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descriptors);
+int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex);
+void *listenthread(void *thread_param);
+int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors);
+void *appenddatathread(void *thread_param);
 int appenddata(int sfd, int dfd, pthread_mutex_t *sfdmutex);
 int createdatafile();
 int deletedatafile();

@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <syslog.h>
 #include <pthread.h>
+#include <sys/queue.h>
 
 #include "aesdsocket.h"
 
@@ -99,13 +100,13 @@ int startserver(bool daemonize) {
     server_descriptors->mutex = malloc(sizeof(pthread_mutex_t));
     server_descriptors->dfd = dfd;
     server_descriptors->sfd = sfd;
-    pthread_mutex_init(server_descriptors->mutex, NULL);
-    r = startacceptconnectionthread(&server_thread, server_descriptors);
+    pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
+    r = startlistenthread(&server_thread, server_descriptors);
     if(r) {
-        log_errno("main(): startacceptconnectionthread()");
+        log_errno("main(): startlistenthread()");
         return 1;
     }
-    syslog(LOG_DEBUG,"ordered start of acceptconnectionthread");
+    syslog(LOG_DEBUG,"ordered start of listenthread");
     
     struct sigaction signal_action;
     memset(&signal_action,0,sizeof(struct sigaction));
@@ -116,8 +117,6 @@ int startserver(bool daemonize) {
         log_errno("main(): sigaction()");
         return 1;
     }
-
-
     syslog(LOG_INFO, "server started");
     return 0;
 }
@@ -144,21 +143,19 @@ int stopserver() {
     return 0;
 }
 
-void *acceptconnectionthread(void *thread_param) {
+void *listenthread(void *thread_param) {
     struct descriptors_t *desc = (struct descriptors_t *)thread_param;
-    pthread_mutex_lock(desc->mutex);
     int sfd = desc->sfd;
     int dfd = desc->dfd;
     pthread_mutex_t *dfdmutex = desc->mutex;
-    pthread_mutex_unlock(desc->mutex);
-    syslog(LOG_DEBUG,"acceptconnectionthread is alive");
-    acceptconnection(sfd, dfd, dfdmutex);   //it's nice getting out of pointer-land, mostly
+    syslog(LOG_DEBUG,"listenthread is alive");
+    listenfunc(sfd, dfd, dfdmutex);   //it's nice getting out of pointer-land, mostly
     return thread_param;
 }
 
 // The proper way to use this is as a thread, because it has a blocking 
 // function.
-int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
+int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
     int r;
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
@@ -198,26 +195,32 @@ int acceptconnection(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
    
 }
 
-int startacceptconnectionthread(pthread_t *thread, struct descriptors_t *descriptors) {
+int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors) {
     int r;
     if(descriptors == NULL) {
-        perror("startacceptconnectionthread(): malloc()");
+        perror("startlistenthread(): malloc()");
         return -1;
     }
-    syslog(LOG_DEBUG, "startacceptconnectionthread sfd = %i; dfd = %i",descriptors->sfd,descriptors->dfd);
-    r = pthread_create(thread, NULL, acceptconnectionthread, descriptors);
+    syslog(LOG_DEBUG, "startlistenthread sfd = %i; dfd = %i",descriptors->sfd,descriptors->dfd);
+    r = pthread_create(thread, NULL, listenthread, descriptors);
     if(r) {
-        perror("startacceptconnectionthread(): pthread_create()");
+        perror("startlistenthread(): pthread_create()");
         return -1;
     }
     return 0;
+}
+
+void *appenddatathread(void *thread_param) {
+    struct append_t  * d = (struct append_t *)thread_param;
+    d->ret = appenddata(d->rsfd, d->dfd, d->dfdmutex);
+    return thread_param;
 }
 
 int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
     int buf_len = 1024;  //arbitrary
     void *buf = malloc(buf_len+1);
     size_t readcount, writecount;
-    // Read read the socket and write into datafile
+    // Read the socket and write into datafile
     while(true) {
         readcount = read(rsfd, buf, buf_len);
         if (readcount == -1) {
@@ -226,10 +229,12 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
         }
         else if (readcount == 0) {
             syslog(LOG_DEBUG,"appenddata received FIN from client");
-            goto successcleanup;
+            break;
         }
 
+        pthread_mutex_lock(dfdmutex);
         writecount = write(dfd, buf, readcount);
+        pthread_mutex_unlock(dfdmutex);
 
         if(writecount == -1) {
             log_errno("appenddata(): data write()");
@@ -271,7 +276,6 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
         }
     }
 
-    successcleanup:
     free(buf);
     return 0;
 
