@@ -15,10 +15,13 @@
 #include <errno.h>
 #include <signal.h>
 #include <syslog.h>
+#include <poll.h>
 #include <pthread.h>
 #include <sys/queue.h>
 
 #include "aesdsocket.h"
+
+#define POLL_TIMEOUT_MS 20
 
 /* Comments:
  *  This server launches a thread dedicated to listening on the passive
@@ -46,14 +49,8 @@ int main(int argc, char *argv[]) {
     r = startserver(daemonize);  // opens syslog, socket, file
     if(r) {return r;}
 
-    
-
-    flag_idling_main_thread = true;
-    while(flag_idling_main_thread){pause();}
     syslog(LOG_INFO, "Caught signal, exiting");
     syslog(LOG_DEBUG, "Caught %s signal",strsignal(last_signal_caught));
-
-
     r = stopserver();   // closes socket, file and syslog (and deletes file)
     return r;
 }
@@ -96,18 +93,6 @@ int startserver(bool daemonize) {
         }
     }
 
-    server_descriptors = (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
-    server_descriptors->mutex = malloc(sizeof(pthread_mutex_t));
-    server_descriptors->dfd = dfd;
-    server_descriptors->sfd = sfd;
-    pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
-    r = startlistenthread(&server_thread, server_descriptors);
-    if(r) {
-        log_errno("main(): startlistenthread()");
-        return 1;
-    }
-    syslog(LOG_DEBUG,"ordered start of listenthread");
-    
     struct sigaction signal_action;
     memset(&signal_action,0,sizeof(struct sigaction));
     signal_action.sa_handler = signal_handler;
@@ -117,14 +102,29 @@ int startserver(bool daemonize) {
         log_errno("main(): sigaction()");
         return 1;
     }
-    syslog(LOG_INFO, "server started");
+
+    server_descriptors = 
+        (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
+    server_descriptors->mutex = malloc(sizeof(pthread_mutex_t));
+    server_descriptors->dfd = dfd;
+    server_descriptors->sfd = sfd;
+    pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
+
+    syslog(LOG_DEBUG,"Ordering start of listenfunc");
+
+    r = listenfunc( server_descriptors->sfd, 
+                    server_descriptors->dfd,
+                    server_descriptors->mutex);
+    if(r) {
+        log_errno("main(): startlistenthread()");
+        return 1;
+    }
+
     return 0;
 }
 
 int stopserver() {
     int r;
-    syslog(LOG_DEBUG, "stopping thread");
-    pthread_cancel(server_thread);
     pthread_mutex_destroy(server_descriptors->mutex);
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     r = closesocket(server_descriptors->sfd);
@@ -159,15 +159,32 @@ int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
     int r;
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
     flag_accepting_connections = true;
+    int rsfd;   //receiving socket-file-descriptor
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    TAILQ_HEAD(head_s, append_t) append_head;
+    TAILQ_INIT(&append_head);
+    struct append_t * append_inst = NULL;
+
+    struct pollfd sfd_poll = { 
+        .fd = sfd, 
+        .events  = POLLIN|POLLPRI, 
+        .revents = 0
+    };
+
     while(flag_accepting_connections) {
-        int rsfd;   //receiving socket-file-descriptor
-        struct sockaddr_storage client_addr;
-        socklen_t client_addr_len = sizeof(client_addr);
+
+        poll(&sfd_poll,1,POLL_TIMEOUT_MS);
+        if(!(sfd_poll.revents&(POLLIN|POLLPRI)))
+            continue;
+
         rsfd = accept(sfd,(struct sockaddr *)&client_addr,&client_addr_len);
         if(rsfd == -1) {
-            log_errno("acceptconnection(): accept()");
-            return -1;
+            log_errno("listenfunc(): accept()");
+            goto errorcleanup;
         }
+
         #ifdef __DEBUG_MESSAGES
             char hoststr[NI_MAXHOST];
             char portstr[NI_MAXSERV];
@@ -178,21 +195,41 @@ int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
             }
             syslog(LOG_DEBUG,"Opened new rsfd descriptor # %i",rsfd);
         #endif
-        // TODO: call appenddata on an independent thread and loop
-        r = appenddata(rsfd, dfd, dfdmutex);
-        if(r) {
-            log_errno("acceptconnection(): appenddata()");
-            robustclose(rsfd);
-            return r;
+
+        append_inst = NULL;
+        append_inst = malloc(sizeof(struct append_t));
+        if(append_inst == NULL) {
+            log_errno("listenfunc(): malloc()");
+            goto errorcleanup;
         }
-        robustclose(rsfd);
-        #ifdef __DEBUG_MESSAGES
-        syslog(LOG_DEBUG,"Closed file descriptor #%i",rsfd);
-        syslog(LOG_INFO,"Closed connection from %s port %s", hoststr, portstr);
-        #endif
+
+        append_inst->rsfd = rsfd;
+        append_inst->dfd = dfd;
+        append_inst->dfdmutex = dfdmutex;
+        r = pthread_create(&append_inst->thread, NULL, appenddatathread, append_inst);
+        TAILQ_INSERT_TAIL(&append_head,append_inst,nodes);
+
+        if(r) {
+            log_errno("listenfunc(): appenddata()");
+            robustclose(rsfd);
+            goto errorcleanup;
+        }
     }
-    return 0;
-   
+
+    r = 0;
+    errorcleanup:
+    TAILQ_FOREACH(append_inst, &append_head, nodes) {
+        pthread_join(append_inst->thread,NULL);
+        //robustclose(append_inst->rsfd);
+    }
+    while(!TAILQ_EMPTY(&append_head))
+    {
+        append_inst = TAILQ_FIRST(&append_head);
+        TAILQ_REMOVE(&append_head, append_inst, nodes);
+        free(append_inst);
+        append_inst = NULL;
+    }
+    return r;
 }
 
 int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors) {
@@ -213,15 +250,33 @@ int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors) {
 void *appenddatathread(void *thread_param) {
     struct append_t  * d = (struct append_t *)thread_param;
     d->ret = appenddata(d->rsfd, d->dfd, d->dfdmutex);
+    closesocket(d->rsfd);
+    #ifdef __DEBUG_MESSAGES
+    syslog(LOG_DEBUG,"Closed file descriptor #%i",d->rsfd);
+    #endif
     return thread_param;
 }
 
 int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
+
+    int r = -1;
     int buf_len = 1024;  //arbitrary
     void *buf = malloc(buf_len+1);
     size_t readcount, writecount;
+    struct pollfd rsfd_poll = { 
+        .fd = rsfd, 
+        .events  = POLLIN|POLLPRI, 
+        .revents = 0
+    };
+    struct timespec timeout;
     // Read the socket and write into datafile
-    while(true) {
+
+    while(flag_accepting_connections) {
+
+        poll(&rsfd_poll,1,POLL_TIMEOUT_MS);
+        if(!(rsfd_poll.revents&(POLLIN|POLLPRI)))
+            continue;
+
         readcount = read(rsfd, buf, buf_len);
         if (readcount == -1) {
             log_errno("appenddata(): socket read()");
@@ -232,7 +287,10 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
             break;
         }
 
-        pthread_mutex_lock(dfdmutex);
+        do {
+            clock_gettime(CLOCK_REALTIME,&timeout);
+            timeout.tv_nsec += (POLL_TIMEOUT_MS*1000);
+        } while(pthread_mutex_timedlock(dfdmutex,&timeout));
         writecount = write(dfd, buf, readcount);
         pthread_mutex_unlock(dfdmutex);
 
@@ -276,12 +334,10 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
         }
     }
 
-    free(buf);
-    return 0;
-
+    r = 0;
     errorcleanup:
     free(buf);
-    return -1;
+    return r;
 }
 
 int opensocket() {

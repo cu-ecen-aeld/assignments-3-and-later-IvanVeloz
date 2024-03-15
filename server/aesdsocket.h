@@ -46,22 +46,15 @@ struct descriptors_t {
 struct descriptors_t *server_descriptors;
 pthread_t server_thread;
 
-struct filedesc_t {
-    pthread_mutex_t *dfdmutex;   // data file mutex
-    pthread_mutex_t *sfdmutex;   // socket file mutex
-    int *dfd;
-    int *sfd;
-};
-
 // Passed to appenddata() threads. This data would be on a TAILQ list and each
 // list element is assigned to a thread.
 struct append_t {
-    pthread_mutex_t * const dfdmutex;   // Mutex for data file descriptor
-    int const dfd;                      // Data file descriptor
-    int const rsfd;                     // Socket file descriptor
-    int const thread;                   // Thread ID
-    int ret;                            // Return value
-    TAILQ_ENTRY(append_t) nodes;        // TAILQ nodes
+    pthread_mutex_t * dfdmutex;     // Mutex for data file descriptor
+    int dfd;                        // Data file descriptor
+    int rsfd;                       // Socket file descriptor
+    pthread_t thread;               // Thread ID
+    int ret;                        // Return value
+    TAILQ_ENTRY(append_t) nodes;    // TAILQ nodes
 };
 
 int main(int argc, char *argv[]);
