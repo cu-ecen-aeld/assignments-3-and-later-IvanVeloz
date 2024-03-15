@@ -152,8 +152,6 @@ void *listenthread(void *thread_param) {
     return thread_param;
 }
 
-// The proper way to use this is as a thread, because it has a blocking 
-// function.
 int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
     int r;
     syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
