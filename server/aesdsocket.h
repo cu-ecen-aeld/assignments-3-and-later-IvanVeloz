@@ -57,6 +57,14 @@ struct append_t {
     TAILQ_ENTRY(append_t) nodes;    // TAILQ nodes
 };
 
+struct timestamp_t {
+    pthread_mutex_t * dfdmutex;     // Mutex for data file descriptor
+    int dfd;                        // Data file descriptor
+    pthread_t thread;               // Thread ID
+    int ret;                        // Return value
+};
+struct timestamp_t *timestamp_descriptors;
+
 int main(int argc, char *argv[]);
 int startserver(bool daemonize);
 int stopserver();
@@ -69,6 +77,8 @@ void *listenthread(void *thread_param);
 int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors);
 void *appenddatathread(void *thread_param);
 int appenddata(int sfd, int dfd, pthread_mutex_t *sfdmutex);
+void *timestampthread(void *thread_param);
+int timestamp(int dfd, pthread_mutex_t *dfdmutex);
 int createdatafile();
 int deletedatafile();
 int robustclose(int fd);

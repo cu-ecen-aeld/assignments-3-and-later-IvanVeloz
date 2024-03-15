@@ -21,7 +21,9 @@
 
 #include "aesdsocket.h"
 
-#define POLL_TIMEOUT_MS 20
+#define POLL_TIMEOUT_MS     20
+#define TIMESTAMP_MAX_SIZE  100
+#define TIMESTAMP_FMT       "timestamp:%a, %d %b %Y %T %z\n"
 
 /* Comments:
  *  This server launches a thread dedicated to listening on the passive
@@ -109,6 +111,18 @@ int startserver(bool daemonize) {
     server_descriptors->sfd = sfd;
     pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
 
+    timestamp_descriptors = 
+        (struct timestamp_t *) malloc(sizeof(struct timestamp_t));
+    timestamp_descriptors->dfd = dfd;
+    timestamp_descriptors->dfdmutex = server_descriptors->mutex;
+
+    syslog(LOG_DEBUG,"Ordering start timestamp");
+    r = pthread_create(&timestamp_descriptors->thread, NULL, timestampthread, timestamp_descriptors);
+    if(r) {
+        perror("startlistenthread(): pthread_create()");
+        return -1;
+    }
+
     syslog(LOG_DEBUG,"Ordering start of listenfunc");
 
     r = listenfunc( server_descriptors->sfd, 
@@ -118,12 +132,15 @@ int startserver(bool daemonize) {
         log_errno("main(): startlistenthread()");
         return 1;
     }
-
     return 0;
 }
 
 int stopserver() {
     int r;
+    syslog(LOG_DEBUG, "sending SIGTERM to timestampthread");
+    pthread_kill(timestamp_descriptors->thread, SIGINT);
+    syslog(LOG_DEBUG, "waiting for timestamp thread to exit");
+    r = pthread_join(timestamp_descriptors->thread, NULL);
     pthread_mutex_destroy(server_descriptors->mutex);
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     r = closesocket(server_descriptors->sfd);
@@ -135,6 +152,7 @@ int stopserver() {
     deletedatafile();
     if(r) {return 1;}
     syslog(LOG_DEBUG, "freeing global mallocs");
+    pthread_mutex_destroy(server_descriptors->mutex);
     free(server_descriptors->mutex);
     free(server_descriptors);
     syslog(LOG_DEBUG, "server stopped");
@@ -333,6 +351,70 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
     r = 0;
     errorcleanup:
     free(buf);
+    return r;
+}
+
+void *timestampthread(void *thread_param) {
+    int r;
+    struct timestamp_t * d = (struct timestamp_t *) thread_param;
+    struct timespec period = {.tv_sec = 10, .tv_nsec = 0};
+    do
+    {
+        r = clock_nanosleep(CLOCK_MONOTONIC,0,&period,NULL);
+        if(r == EINTR) {
+            r = 0;
+            break;
+        }
+        else if(r) {
+            log_errno("timestampthread(): clock_nanosleep()");
+            goto errorcleanup;
+        }
+        d->ret = timestamp(d->dfd, d->dfdmutex);
+    } while(flag_accepting_connections);
+    r = 0;
+    errorcleanup:
+    d->ret = r;
+    return thread_param;
+}
+
+int timestamp(int dfd, pthread_mutex_t *dfdmutex) {
+    int r = -1;
+    char tstr[TIMESTAMP_MAX_SIZE];
+    size_t tstr_size;
+    time_t t;
+    struct timespec timeout;
+    ssize_t writecount;
+
+    do {
+        clock_gettime(CLOCK_REALTIME,&timeout);
+        timeout.tv_nsec += (POLL_TIMEOUT_MS*1000);
+    } while(pthread_mutex_timedlock(dfdmutex,&timeout));
+
+    t = time(NULL);
+
+    if(t == (time_t)-1) {
+        log_errno("timestamp(): ");
+        goto errorcleanup;
+    }
+
+    struct tm * tm = gmtime(&t);
+
+    tstr_size = strftime(tstr, TIMESTAMP_MAX_SIZE, TIMESTAMP_FMT, tm);
+    if(tstr_size == 0) {
+        syslog(LOG_DEBUG,"strftime string size is too small");
+        goto errorcleanup;
+    }
+
+    writecount = write(dfd, tstr, tstr_size);
+    if(writecount < tstr_size) {
+        log_errno("timestamp(): write(): ");
+        goto errorcleanup;
+    }
+
+    r = 0;
+    syslog(LOG_DEBUG,"Appended %s",tstr);
+    errorcleanup:
+    pthread_mutex_unlock(dfdmutex);
     return r;
 }
 
