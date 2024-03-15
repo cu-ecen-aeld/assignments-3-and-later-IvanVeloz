@@ -27,13 +27,12 @@
  *  This server launches a thread dedicated to listening on the passive
  *  socket bound to 0.0.0.0:9000.
  *
- *  The server could be made to handle multiple connections simultaneously if
- *  appenddata() is wrapped around a thread (use the mutex to lock fdf). This
- *  is why mutex types exist around the program. In the end they weren´t
- *  necessary. As it is, the server handles connections sequentially.
- *
- *  The parent thread is free to do anything. There is a while(true) loop
- *  in main that sleeps until it gets a SIGINT or SIGTERM.
+ *  After an incoming connection is established on that socket, a receiving
+ *  socket is open to communicate with the client. A new thread is created
+ *  to handle the communication with that particular client.
+ * 
+ *  A global mutex makes sure the log file is only writen to by one thread at
+ *  a time.
  *  
  */
 
@@ -220,7 +219,6 @@ int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
     errorcleanup:
     TAILQ_FOREACH(append_inst, &append_head, nodes) {
         pthread_join(append_inst->thread,NULL);
-        //robustclose(append_inst->rsfd);
     }
     while(!TAILQ_EMPTY(&append_head))
     {
