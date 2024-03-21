@@ -489,7 +489,7 @@ int closesocket(int sfd) {
 }
 
 int opendatafile() {
-    int fd = open(datapath,O_APPEND|O_CREAT|O_RDWR|O_TRUNC);
+    int fd = open(datapath, O_APPEND|O_CREAT|O_RDWR|O_TRUNC, S_IRWXU|S_IRWXG);
     if(fd == -1) {
         log_errno("opendatafile(): open()");
     }
