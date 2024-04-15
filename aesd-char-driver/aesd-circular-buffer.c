@@ -36,7 +36,6 @@
 #include "aesd-circular-buffer.h"
 
 static bool aesd_circular_increment(uint8_t *index, uint8_t max_index);
-///static uint8_t aesd_circular_calc_offset(uint8_t index, uint8_t inc, uint8_t max_index);
 
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
@@ -89,8 +88,6 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     }
     r = NULL;
     success:
-    //buffer->full = false;
-    //aesd_circular_increment(&buffer->out_offs, AESDCHAR_MAX_INDEX);
     return r;
 }
 
@@ -151,17 +148,3 @@ static bool aesd_circular_increment(uint8_t *index, uint8_t max_index) {
         return false;
     }
 }
-
-/**
- * Calculates the index that would result from incrementing @param index by
- * @param inc positions, taking consideration the maximum @param entry_size and 
- * overflowing if necessary. For example, if the index is 7, the increment is 4 
- * and the max_index is 9, the function returns 1. Another example, if the 
- * index is 3, the increment is 4 and the max_index is 9, the function 
- * returns 7. Only works for increments.
- * @return the expected index resulting from the increment.
- */
-//static uint8_t aesd_circular_calc_offset(uint8_t index, uint8_t inc, uint8_t max_index) {
-//    uint8_t r = (index + inc) % (max_index+1);
-//    return r;
-//}
