@@ -17,7 +17,7 @@
 #endif
 
 #define AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED 10
-
+#define AESDCHAR_MAX_INDEX (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED-1)
 struct aesd_buffer_entry
 {
     /**
