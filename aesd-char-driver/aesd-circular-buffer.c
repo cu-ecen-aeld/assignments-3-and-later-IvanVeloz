@@ -79,11 +79,14 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     PDEBUG("Entering aesd_buffer_add_entry. buffer->in_offs = %u, buffer->out_offs = %u, buffer->full = %u \n", 
         buffer->in_offs, buffer->out_offs, buffer->full);
     buffer->entry[buffer->in_offs] = *add_entry;
+    PDEBUG("Added to index %u the entry: %s \n",buffer->in_offs, buffer->entry[buffer->in_offs].buffptr);
     aesd_circular_increment(&buffer->in_offs, AESDCHAR_MAX_INDEX);
 
-    if(buffer->in_offs == buffer->out_offs) {
-        buffer->full = true;
+    if(buffer->full) {
         aesd_circular_increment(&buffer->out_offs,AESDCHAR_MAX_INDEX);
+    }
+    else if(buffer->in_offs == buffer->out_offs) {
+        buffer->full = true;    
     }
     PDEBUG("Exiting  aesd_buffer_add_entry. buffer->in_offs = %u, buffer->out_offs = %u, buffer->full = %u \n", 
         buffer->in_offs, buffer->out_offs, buffer->full);
