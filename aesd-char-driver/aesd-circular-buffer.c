@@ -36,6 +36,7 @@
 #include "aesd-circular-buffer.h"
 
 static bool aesd_circular_increment(uint8_t *index, uint8_t max_index);
+///static uint8_t aesd_circular_calc_offset(uint8_t index, uint8_t inc, uint8_t max_index);
 
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
@@ -51,19 +52,45 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
             size_t char_offset, size_t *entry_offset_byte_rtn )
 {
     struct aesd_buffer_entry *r = NULL;
-    buffer->full = false;
 
-    if(buffer->in_offs == buffer->out_offs) {
-        // It's empty
+    if(!buffer->full && buffer->in_offs == buffer->out_offs) {
+        // The buffer is empty
         return NULL;
     }
 
-    r = &buffer->entry[buffer->out_offs];
-    aesd_circular_increment(&buffer->out_offs, AESDCHAR_MAX_INDEX);
-
-    entry_offset_byte_rtn = (char_offset < r->size)? 
-        ((size_t *)(r->buffptr + char_offset)) : (NULL);
     
+    size_t acc_char_offset = 0; //Accumulated char offset
+
+    // Iterate through the circular buffer until we get to in_offs, which
+    // is as far as we have written to the buffer. 
+    // j handles "full buffer" edge case and is a handy counter.
+    for(
+        uint8_t j = 0, i = buffer->out_offs; 
+        j==0 || i != buffer->in_offs; 
+        ++j, aesd_circular_increment(&i,AESDCHAR_MAX_INDEX)
+    ) 
+    {
+        r = &(buffer->entry[i]);
+
+        PDEBUG("Entering i=%u, acc_char_offset=%lu, char_offset=%lu, r->size=%lu\n",
+            i, acc_char_offset,char_offset,r->size);
+
+        if(acc_char_offset + r->size - 1 >= char_offset) {
+            size_t local_offset = char_offset - acc_char_offset;
+            *entry_offset_byte_rtn = local_offset;
+            PDEBUG("Found the desired entry for char_offset %lu at index %i, local_offset %lu\n", 
+                char_offset, i, local_offset);
+            goto success;
+        }
+
+        acc_char_offset = acc_char_offset + r->size;
+        PDEBUG("Entering i=%u, acc_char_offset=%lu char_offset=%lu\n",
+            i, acc_char_offset,char_offset);
+    }
+    r = NULL;
+    success:
+    //buffer->full = false;
+    //aesd_circular_increment(&buffer->out_offs, AESDCHAR_MAX_INDEX);
     return r;
 }
 
@@ -105,11 +132,11 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 
 /**
  * Increment an @param index taking consideration the maximum 
- * @param entry_size and overflowing if necessary. For example, if the index
- * is 8 and entry_size is 9, the index will be incremented to 9. In a different
- * case, if the index is 9 and entry_size is 9, then the index will be 
+ * @param max_index and overflowing if necessary. For example, if the index
+ * is 8 and max_index is 9, the index will be incremented to 9. In a different
+ * case, if the index is 9 and max_index is 9, then the index will be 
  * incremented to 0 and an overflow is considered to have ocurred.
- * In cases where the index is larger than entry_size, index is set to 0 and an
+ * In cases where the index is larger than max_index, index is set to 0 and an
  * overflow is considered to have ocurred.
  * @return true if an overflow ocurred, else returns false.
  */
@@ -124,3 +151,17 @@ static bool aesd_circular_increment(uint8_t *index, uint8_t max_index) {
         return false;
     }
 }
+
+/**
+ * Calculates the index that would result from incrementing @param index by
+ * @param inc positions, taking consideration the maximum @param entry_size and 
+ * overflowing if necessary. For example, if the index is 7, the increment is 4 
+ * and the max_index is 9, the function returns 1. Another example, if the 
+ * index is 3, the increment is 4 and the max_index is 9, the function 
+ * returns 7. Only works for increments.
+ * @return the expected index resulting from the increment.
+ */
+//static uint8_t aesd_circular_calc_offset(uint8_t index, uint8_t inc, uint8_t max_index) {
+//    uint8_t r = (index + inc) % (max_index+1);
+//    return r;
+//}
