@@ -52,14 +52,12 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
             size_t char_offset, size_t *entry_offset_byte_rtn )
 {
     struct aesd_buffer_entry *r = NULL;
+    size_t acc_char_offset = 0; //Accumulated char offset
 
     if(!buffer->full && buffer->in_offs == buffer->out_offs) {
         // The buffer is empty
         return NULL;
     }
-
-    
-    size_t acc_char_offset = 0; //Accumulated char offset
 
     // Iterate through the circular buffer until we get to in_offs, which
     // is as far as we have written to the buffer. 
