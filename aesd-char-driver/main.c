@@ -29,7 +29,14 @@ int aesd_minor =   0;
 MODULE_AUTHOR("Ivan Veloz");
 MODULE_LICENSE("Dual BSD/GPL");
 
-struct aesd_dev aesd_device;
+struct aesd_dev aesd_device = {
+    .we.buffptr = NULL,
+    .we.size = KMALLOC_MAX_SIZE,
+    .we.index = 0,
+    .we.complete = false,
+    .we.finished_entry = NULL,
+    .we_mutex = NULL
+};
 void aesd_cleanup_module(void);
 
 int aesd_open(struct inode *inode, struct file *filp)
@@ -152,9 +159,6 @@ int aesd_init_module(void)
         result = -ENOMEM;
         goto fail;
     }
-    aesd_device.we.size = KMALLOC_MAX_SIZE;
-    aesd_device.we.index = 0;
-    aesd_device.we.complete = false;
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -178,8 +182,10 @@ void aesd_cleanup_module(void)
      * TODO: cleanup AESD specific poritions here as necessary
      */
     kfree(aesd_device.we.buffptr);
-    kfree(aesd_device.we.finished_entry->buffptr);
-    kfree(aesd_device.we.finished_entry);
+    if(aesd_device.we.finished_entry) {
+        kfree(aesd_device.we.finished_entry->buffptr);
+        kfree(aesd_device.we.finished_entry);
+    }
     kfree(aesd_device.we_mutex);
 
     unregister_chrdev_region(devno, 1);
