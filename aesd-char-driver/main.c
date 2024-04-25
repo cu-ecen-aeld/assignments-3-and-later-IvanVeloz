@@ -16,12 +16,17 @@
 #include <linux/printk.h>
 #include <linux/types.h>
 #include <linux/cdev.h>
-#include <linux/fs.h> // file_operations
+#include <linux/fs.h>       // file_operations
+#include <linux/sched.h>    // current process
+#include <linux/slab.h>     // memory allocation constants
 #include "aesdchar.h"
+
+#define KMALLOC_MAX_SIZE      (1UL << KMALLOC_SHIFT_MAX) /* = 4194304 on my PC*/
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
-MODULE_AUTHOR("Ivan Veloz"); /** TODO: fill in your name **/
+MODULE_AUTHOR("Ivan Veloz");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
@@ -29,6 +34,7 @@ struct aesd_dev aesd_device;
 int aesd_open(struct inode *inode, struct file *filp)
 {
     PDEBUG("open");
+    PDEBUG("KMALLOC_MAX_SIZE is %lu",KMALLOC_MAX_SIZE);
     /**
      * TODO: handle open
      */
@@ -48,6 +54,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = 0;
+    PDEBUG("the current process is \"%s\" (pid %i)\n", 
+        current->comm, current->pid);
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle read
