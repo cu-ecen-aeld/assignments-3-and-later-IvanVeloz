@@ -19,6 +19,7 @@
 #include <linux/fs.h>       // file_operations
 #include <linux/sched.h>    // current process
 #include <linux/slab.h>     // memory allocation constants
+#include <linux/uaccess.h>	// copy_*_user
 #include "aesdchar.h"
 
 #define KMALLOC_MAX_SIZE      (1UL << KMALLOC_SHIFT_MAX) /* = 4194304 on my PC*/
@@ -107,17 +108,25 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
      * mean modifying the add_entry funuction for aesd_circular_buffer.
      */
     PDEBUG("count = %lu, we.size = %lu", count, dev->we.size);
-    for(size_t i=0; i<count; retval = ++i) {
-        if(i > dev->we.size - 1) {
-            PDEBUG("Write count exceeds working entry size");
-            retval = -ENOMEM;
-            goto fail;
-        }
-        //dev->we.buffptr[i] = buf[i];
-        //if(buf[i] == '\n') { /* flag the we as complete */ }
-    }
 
-    fail:
+    //if (mutex_lock_interruptible(&dev->we_mutex))
+	//	return -ERESTARTSYS;
+    if(
+        (count > dev->we.size) || 
+        (count + dev->we.index + 1 > dev->we.size ) 
+    ) {
+        PDEBUG("Write count exceeds working entry size");
+        retval = -ENOMEM;
+        goto out;
+    }
+    if(copy_from_user(dev->we.buffptr, buf, count)) {
+        retval = -EFAULT;
+        goto out;
+    }
+    retval = count;
+
+    out:
+    //mutex_unlock(&dev->we_mutex)
     return retval;
 }
 struct file_operations aesd_fops = {
@@ -171,6 +180,7 @@ int aesd_init_module(void)
         result = -ENOMEM;
         goto fail;
     }
+    printk("Got we.buffptr %p", aesd_device.we.buffptr);
 
     result = aesd_setup_cdev(&aesd_device);
 
