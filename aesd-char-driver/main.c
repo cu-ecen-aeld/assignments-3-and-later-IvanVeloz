@@ -30,13 +30,18 @@ MODULE_AUTHOR("Ivan Veloz");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
+struct aesd_cmd aesd_command;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
     PDEBUG("open");
-    PDEBUG("KMALLOC_MAX_SIZE is %lu",KMALLOC_MAX_SIZE);
     /**
      * TODO: handle open
+     */
+
+    /* 
+     * Allocate the circular buffer
+     * Fill all the entries with NULL. You could use the FOREACH macro.
      */
     return 0;
 }
@@ -46,6 +51,9 @@ int aesd_release(struct inode *inode, struct file *filp)
     PDEBUG("release");
     /**
      * TODO: handle release
+     */
+    /*Free all the entries on th circular buffer. You could use the FOREACH 
+     * macro.
      */
     return 0;
 }
@@ -70,6 +78,13 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
+     */
+    /* 
+     * Write to the circular buffer.
+     * If buffer becomes full, free the memory from the entry you are going to 
+     * overwrite _before_ you overwrite that entry. Return a pointer to the
+     * entry you just freed. ("Assignment 8 Overview" minute 10:01). This would 
+     * mean modifying the add_entry funuction for aesd_circular_buffer.
      */
     return retval;
 }
@@ -101,6 +116,7 @@ int aesd_init_module(void)
 {
     dev_t dev = 0;
     int result;
+    PDEBUG("KMALLOC_MAX_SIZE is %lu",KMALLOC_MAX_SIZE);
     result = alloc_chrdev_region(&dev, aesd_minor, 1,
             "aesdchar");
     aesd_major = MAJOR(dev);
@@ -109,6 +125,7 @@ int aesd_init_module(void)
         return result;
     }
     memset(&aesd_device,0,sizeof(struct aesd_dev));
+    memset(&aesd_command,0,sizeof(struct aesd_cmd));
 
     /**
      * TODO: initialize the AESD specific portion of the device

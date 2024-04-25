@@ -31,5 +31,16 @@ struct aesd_dev
     struct cdev cdev;     /* Char device structure      */
 };
 
+struct aesd_cmd
+{
+     /* The buffer entry we to store the command into */
+     struct aesd_buffer_entry *entry;
+     /* To support incomplete entries (partial writes), this index stores the 
+      * last position that has been written to the entry. 
+      */
+     size_t index;
+     /* To support incomplete entries, this flag stores the completion status.*/
+     bool complete;
+};
 
 #endif /* AESD_CHAR_DRIVER_AESDCHAR_H_ */
