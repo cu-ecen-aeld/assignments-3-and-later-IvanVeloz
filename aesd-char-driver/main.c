@@ -108,7 +108,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
      */
     PDEBUG("count = %lu, we.size = %lu", count, dev->we.size);
     for(size_t i=0; i<count; retval = ++i) {
-        if(i > dev->we.size) {
+        if(i > dev->we.size - 1) {
             PDEBUG("Write count exceeds working entry size");
             retval = -ENOMEM;
             goto fail;
