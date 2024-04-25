@@ -10,6 +10,7 @@ else
 endif
 
 EXTRA_CFLAGS += $(DEBFLAGS)
+EXTRA_CFLAGS += -std=gnu99
 
 ifneq ($(KERNELRELEASE),)
 # call from kernel build system

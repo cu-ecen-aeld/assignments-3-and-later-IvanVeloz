@@ -10,6 +10,7 @@
 
 #ifdef __KERNEL__
 #include <linux/string.h>
+#include <linux/printk.h>
 #else
 #include <string.h>
 #include <stdio.h>
