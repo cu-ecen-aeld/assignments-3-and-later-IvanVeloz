@@ -30,6 +30,7 @@ MODULE_AUTHOR("Ivan Veloz");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
+void aesd_cleanup_module(void);
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
@@ -66,6 +67,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     PDEBUG("the current process is \"%s\" (pid %i)\n", 
         current->comm, current->pid);
+    PDEBUG("the index is %lu", dev->we.index);
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle read
@@ -78,7 +80,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     struct aesd_dev *dev = filp->private_data;
-    
+
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
@@ -135,11 +137,18 @@ int aesd_init_module(void)
         printk(KERN_WARNING "Can't get major %d\n", aesd_major);
         return result;
     }
-    memset(&aesd_device,0,sizeof(struct aesd_dev));
 
-    /**
-     * TODO: initialize the AESD specific portion of the device
-     */
+    memset(&aesd_device,0,sizeof(struct aesd_dev));
+    
+    mutex_init(aesd_device.we_mutex);
+    aesd_device.we.buffptr = kmalloc(sizeof(KMALLOC_MAX_SIZE),GFP_KERNEL);
+    if(!aesd_device.we.buffptr) {
+        result = -ENOMEM;
+        goto fail;
+    }
+    memset(aesd_device.we.buffptr, 0, sizeof(KMALLOC_MAX_SIZE));
+    aesd_device.we.index = 15;
+    aesd_device.we.complete = false;
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -148,6 +157,9 @@ int aesd_init_module(void)
     }
     return result;
 
+    fail:
+        aesd_cleanup_module();
+        return result;
 }
 
 void aesd_cleanup_module(void)
@@ -159,6 +171,10 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
+    kfree(aesd_device.we.buffptr);
+    kfree(aesd_device.we.finished_entry->buffptr);
+    kfree(aesd_device.we.finished_entry);
+    kfree(aesd_device.we_mutex);
 
     unregister_chrdev_region(devno, 1);
 }
