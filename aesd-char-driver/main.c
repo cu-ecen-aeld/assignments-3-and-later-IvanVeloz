@@ -30,14 +30,14 @@ MODULE_AUTHOR("Ivan Veloz");
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
-struct aesd_cmd aesd_command;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
+    struct aesd_dev *dev;
+    
     PDEBUG("open");
-    /**
-     * TODO: handle open
-     */
+    dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    filp->private_data = dev; /* for other methods */
 
     /* 
      * Allocate the circular buffer
@@ -62,6 +62,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = 0;
+    struct aesd_dev *dev = filp->private_data;
+
     PDEBUG("the current process is \"%s\" (pid %i)\n", 
         current->comm, current->pid);
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
@@ -75,9 +77,18 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
+    struct aesd_dev *dev = filp->private_data;
+    
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
+     */
+    /* 1. Write to the working entry, and don't mark it as complete until this
+     * functions sees a /n. 
+     * 2. When the working entry is complete, pass it to 
+     * aesd_circular_buffer_add_entry.
+     * 3. Free the memory returned by aesd_circular_buffer_add_entry.
+     * 4. Allocate new memory for 
      */
     /* 
      * Write to the circular buffer.
@@ -125,7 +136,6 @@ int aesd_init_module(void)
         return result;
     }
     memset(&aesd_device,0,sizeof(struct aesd_dev));
-    memset(&aesd_command,0,sizeof(struct aesd_cmd));
 
     /**
      * TODO: initialize the AESD specific portion of the device

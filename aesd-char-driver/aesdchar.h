@@ -23,24 +23,33 @@
 #  define PDEBUG(fmt, args...) /* not debugging: nothing */
 #endif
 
-struct aesd_dev
-{
-    /**
-     * TODO: Add structure(s) and locks needed to complete assignment requirements
-     */
-    struct cdev cdev;     /* Char device structure      */
-};
+#include <linux/mutex.h>
 
-struct aesd_cmd
+struct aesd_working_entry
 {
-     /* The buffer entry we to store the command into */
-     struct aesd_buffer_entry *entry;
+     /* Pointer buffer entry we to store the command into. Allocate as much 
+      * memory as kmalloc() allows, to comply with assignment requirements. */
+     struct aesd_buffer_entry * const workingentry;
      /* To support incomplete entries (partial writes), this index stores the 
       * last position that has been written to the entry. 
       */
      size_t index;
      /* To support incomplete entries, this flag stores the completion status.*/
      bool complete;
+    /* The buffer entry we copy the finished command into. Allocate the minimum
+     * size possible (use index or workingentry.size). 
+     */
+     struct aesd_buffer_entry *finishedentry;
+};
+
+struct aesd_dev
+{
+    /**
+     * TODO: Add structure(s) and locks needed to complete assignment requirements
+     */
+    struct cdev cdev;                           /* Char device structure      */
+    struct aesd_working_entry working_entry;    /* Working entry */     
+    struct mutex working_mutex;                 /* Locking primitive */
 };
 
 #endif /* AESD_CHAR_DRIVER_AESDCHAR_H_ */
