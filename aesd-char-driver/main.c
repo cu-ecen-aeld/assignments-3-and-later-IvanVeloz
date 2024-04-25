@@ -106,6 +106,18 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
      * entry you just freed. ("Assignment 8 Overview" minute 10:01). This would 
      * mean modifying the add_entry funuction for aesd_circular_buffer.
      */
+    PDEBUG("count = %lu, we.size = %lu", count, dev->we.size);
+    for(size_t i=0; i<count; retval = ++i) {
+        if(i > dev->we.size) {
+            PDEBUG("Write count exceeds working entry size");
+            retval = -ENOMEM;
+            goto fail;
+        }
+        //dev->we.buffptr[i] = buf[i];
+        //if(buf[i] == '\n') { /* flag the we as complete */ }
+    }
+
+    fail:
     return retval;
 }
 struct file_operations aesd_fops = {
@@ -145,7 +157,7 @@ int aesd_init_module(void)
         return result;
     }
 
-    memset(&aesd_device,0,sizeof(struct aesd_dev));
+    //memset(&aesd_device,0,sizeof(struct aesd_dev));
 
     aesd_device.we_mutex = kzalloc(sizeof(struct mutex),GFP_KERNEL);
     if(!aesd_device.we_mutex) {
