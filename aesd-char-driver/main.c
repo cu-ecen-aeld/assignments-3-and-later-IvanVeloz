@@ -139,15 +139,21 @@ int aesd_init_module(void)
     }
 
     memset(&aesd_device,0,sizeof(struct aesd_dev));
-    
+
+    aesd_device.we_mutex = kzalloc(sizeof(struct mutex),GFP_KERNEL);
+    if(!aesd_device.we_mutex) {
+        result = -ENOMEM;
+        goto fail;
+    }
     mutex_init(aesd_device.we_mutex);
-    aesd_device.we.buffptr = kmalloc(sizeof(KMALLOC_MAX_SIZE),GFP_KERNEL);
+
+    aesd_device.we.buffptr = kzalloc(KMALLOC_MAX_SIZE,GFP_KERNEL);
     if(!aesd_device.we.buffptr) {
         result = -ENOMEM;
         goto fail;
     }
-    memset(aesd_device.we.buffptr, 0, sizeof(KMALLOC_MAX_SIZE));
-    aesd_device.we.index = 15;
+    aesd_device.we.size = KMALLOC_MAX_SIZE;
+    aesd_device.we.index = 0;
     aesd_device.we.complete = false;
 
     result = aesd_setup_cdev(&aesd_device);
