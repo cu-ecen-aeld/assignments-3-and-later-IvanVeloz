@@ -86,6 +86,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
+    size_t s;
     struct aesd_dev *dev = filp->private_data;
 
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
@@ -107,24 +108,31 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
      * mean modifying the add_entry funuction for aesd_circular_buffer.
      */
     PDEBUG("count = %lu, we.size = %lu", count, dev->we.size);
-
+    PDEBUG("index = %lu", dev->we.index);
     if (mutex_lock_interruptible(&dev->we_mutex))
 		return -ERESTARTSYS;
     if(
         (count > dev->we.size) || 
-        (count + dev->we.index + 1 > dev->we.size ) 
+        (count + dev->we.index > dev->we.size ) 
     ) {
         PDEBUG("Write count exceeds working entry size");
         retval = -ENOMEM;
         goto out;
     }
-    if(copy_from_user(dev->we.buffptr, buf, count)) {
+    if((s = copy_from_user((dev->we.buffptr + dev->we.index), buf, count))) {
+        dev->we.index += count - s;
         retval = -EFAULT;
         goto out;
     }
+    
+    s = dev->we.index;
+    dev->we.index += count;
+
+
     retval = count;
 
     out:
+    PDEBUG("Index is at %lu", dev->we.index);
     mutex_unlock(&dev->we_mutex);
     return retval;
 }
