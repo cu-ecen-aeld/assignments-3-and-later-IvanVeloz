@@ -44,7 +44,7 @@ struct aesd_working_entry
     /* The buffer entry we copy the finished command into. Allocate the minimum
      * size possible (use index or workingentry.size). 
      */
-     struct aesd_buffer_entry *finished_entry;
+     struct aesd_buffer_entry finished_entry;
 };
 
 struct aesd_dev
@@ -55,6 +55,8 @@ struct aesd_dev
     struct cdev cdev;                           /* Char device structure      */
     struct aesd_working_entry we;               /* Working entry */     
     struct mutex we_mutex;                      /* Locking primitive */
+    struct aesd_circular_buffer cb;             /* Circular buffer */
+    struct mutex cb_mutex;                      /* Locking primitive */
 };
 
 #endif /* AESD_CHAR_DRIVER_AESDCHAR_H_ */

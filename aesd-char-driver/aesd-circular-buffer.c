@@ -96,15 +96,14 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * new start location.
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
-* @returns NULL if not full or a pointer to an aesd_buffer_entry struct that needs to be freed (including the pointers
-* within that struct).
+* @returns NULL if not full or a pointer to a *buffptr member of aesd_buffer_entry that needs to be freed.
 */
-struct aesd_buffer_entry * aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char * aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
-    struct aesd_buffer_entry * r = NULL;
+    const char * r = NULL;
     PDEBUG("Entering aesd_buffer_add_entry. buffer->in_offs = %u, buffer->out_offs = %u, buffer->full = %u\n", 
         buffer->in_offs, buffer->out_offs, buffer->full);
-    r = &(buffer->entry[buffer->in_offs]);
+    r = buffer->entry[buffer->in_offs].buffptr;
     buffer->entry[buffer->in_offs] = *add_entry;
     PDEBUG("Added to index %u the entry: %s \n",buffer->in_offs, buffer->entry[buffer->in_offs].buffptr);
     aesd_circular_increment(&buffer->in_offs, AESDCHAR_MAX_INDEX);
