@@ -42,27 +42,47 @@ void aesd_cleanup_module(void);
 int aesd_open(struct inode *inode, struct file *filp)
 {
     struct aesd_dev *dev;
+    uint8_t i;
+    struct aesd_buffer_entry *e;
     
     PDEBUG("open");
     dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     filp->private_data = dev; /* for other methods */
 
-    /* 
-     * Allocate the circular buffer
-     * Fill all the entries with NULL. You could use the FOREACH macro.
+    if (mutex_lock_interruptible(&dev->cb_mutex))
+        return -ERESTARTSYS;  
+    /* Just in case we open with an existing buffer created.
+     * This kfree should have no effect if we just initialized 
+     * recently.
      */
+    AESD_CIRCULAR_BUFFER_FOREACH(e,&(dev->cb),i) {
+        kfree(e->buffptr);
+        e->buffptr = NULL;
+    }
+    aesd_circular_buffer_init(&dev->cb);
+    mutex_unlock(&dev->cb_mutex);
+
     return 0;
 }
 
 int aesd_release(struct inode *inode, struct file *filp)
 {
+    struct aesd_dev *dev;
+    uint8_t i;
+    struct aesd_buffer_entry *e;
+
     PDEBUG("release");
-    /**
-     * TODO: handle release
-     */
-    /*Free all the entries on th circular buffer. You could use the FOREACH 
-     * macro.
-     */
+    dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    filp->private_data = dev; /* for other methods */
+
+    if (mutex_lock_interruptible(&dev->cb_mutex))
+        return -ERESTARTSYS;
+    
+    AESD_CIRCULAR_BUFFER_FOREACH(e,&(dev->cb),i) {
+        kfree(e->buffptr);
+        e->buffptr = NULL;
+    }
+    mutex_unlock(&dev->cb_mutex);
     return 0;
 }
 
@@ -203,16 +223,13 @@ int aesd_init_module(void)
     //memset(&aesd_device,0,sizeof(struct aesd_dev));
 
     mutex_init(&aesd_device.we_mutex);
+    mutex_init(&aesd_device.cb_mutex);
 
     aesd_device.we.buffptr = kzalloc(KMALLOC_MAX_SIZE,GFP_KERNEL);
     if(!aesd_device.we.buffptr) {
         result = -ENOMEM;
         goto fail;
     }
-    printk("Got we.buffptr %p", aesd_device.we.buffptr);
-
-    mutex_init(&aesd_device.we_mutex);
-    aesd_circular_buffer_init(&aesd_device.cb);
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -234,18 +251,21 @@ void aesd_cleanup_module(void)
 
     cdev_del(&aesd_device.cdev);
 
-    if (mutex_lock_interruptible(&aesd_device.we_mutex))
-		return -ERESTARTSYS;
-    if (mutex_lock_interruptible(&aesd_device.cb_mutex))
-        return -ERESTARTSYS;
-    
-    AESD_CIRCULAR_BUFFER_FOREACH(e,&(aesd_device.cb),i) {
-        kfree(e->buffptr);
+    while (mutex_lock_interruptible(&aesd_device.we_mutex)) {
+        printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!");
     }
     kfree(aesd_device.we.buffptr);
-    mutex_unlock(&aesd_device.we_mutex);
+    while (mutex_lock_interruptible(&aesd_device.cb_mutex)) {
+        printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!"); 
+    }
+    AESD_CIRCULAR_BUFFER_FOREACH(e,&(aesd_device.cb),i) {
+        kfree(e->buffptr);
+        e->buffptr = NULL;
+    }
     mutex_unlock(&aesd_device.cb_mutex);
-    
+    mutex_unlock(&aesd_device.we_mutex);
+
+
     unregister_chrdev_region(devno, 1);
 }
 
