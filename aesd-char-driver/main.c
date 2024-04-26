@@ -127,7 +127,27 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     
     s = dev->we.index;
     dev->we.index += count;
-
+    for(; s < dev->we.index; s++) {
+        if(dev->we.buffptr[s] == '\n') {
+            struct aesd_buffer_entry *retentry;
+            PDEBUG("Found \\n at index %lu; adding entry now",s);
+            dev->we.complete = true;
+            dev->we.finished_entry = 
+                kzalloc(sizeof(struct aesd_buffer_entry), GFP_KERNEL);
+            dev->we.finished_entry->buffptr = 
+                kzalloc(s+2, GFP_KERNEL);   // +2 to fit null terminator
+            /* add entry to circular buffer here */
+            retentry = dev->we.finished_entry;
+            /* end of "add entry to circular buffer here" */
+            if(retentry) {
+                kfree(retentry->buffptr);
+                kfree(retentry);
+            }
+            dev->we.index = 0;
+            dev->we.complete = false;
+            break;
+        }
+    }
 
     retval = count;
 
