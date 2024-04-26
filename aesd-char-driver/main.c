@@ -243,7 +243,8 @@ void aesd_cleanup_module(void)
         kfree(e->buffptr);
     }
     kfree(aesd_device.we.buffptr);
-
+    mutex_unlock(&aesd_device.we_mutex);
+    mutex_unlock(&aesd_device.cb_mutex);
     
     unregister_chrdev_region(devno, 1);
 }
