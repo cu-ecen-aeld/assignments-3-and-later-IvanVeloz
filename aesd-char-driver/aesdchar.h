@@ -41,10 +41,6 @@ struct aesd_working_entry
      size_t index;
      /* To support incomplete entries, this flag stores the completion status.*/
      bool complete;
-    /* The buffer entry we copy the finished command into. Allocate the minimum
-     * size possible (use index or workingentry.size). 
-     */
-     struct aesd_buffer_entry finished_entry;
 };
 
 struct aesd_dev

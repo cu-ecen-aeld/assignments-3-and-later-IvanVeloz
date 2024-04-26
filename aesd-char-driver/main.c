@@ -36,8 +36,6 @@ struct aesd_dev aesd_device = {
     .we.size = KMALLOC_MAX_SIZE,
     .we.index = 0,
     .we.complete = false,
-    .we.finished_entry.buffptr = NULL,
-    .we.finished_entry.size = 0
 };
 void aesd_cleanup_module(void);
 
@@ -90,6 +88,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     ssize_t retval = -ENOMEM;
     size_t s;
     struct aesd_dev *dev = filp->private_data;
+    struct aesd_buffer_entry finished_entry = {
+        .buffptr = NULL,
+        .size = 0
+    };
 
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
@@ -134,22 +136,21 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             const char *retbuffptr;
             PDEBUG("Found \\n at index %lu; adding entry now",s);
             dev->we.complete = true;
-            dev->we.finished_entry.buffptr = 
+            finished_entry.buffptr = 
                 kzalloc(s+2, GFP_KERNEL);   // +2 to fit null terminator
                 
             if (mutex_lock_interruptible(&dev->cb_mutex))
 		        return -ERESTARTSYS;
             retbuffptr = aesd_circular_buffer_add_entry(
                     &(dev->cb), 
-                    &(dev->we.finished_entry) );
+                    &(finished_entry) );
             PDEBUG("Entered buffptr %p to circular buffer", 
-                dev->we.finished_entry.buffptr);
+                finished_entry.buffptr);
             PDEBUG("Freeing retbuffptr %p", retbuffptr);
             kfree(retbuffptr);
             mutex_unlock(&dev->cb_mutex);
 
             dev->we.index = 0;
-            dev->we.finished_entry.buffptr = NULL;
             dev->we.complete = false;
             break;
         }
@@ -234,22 +235,16 @@ void aesd_cleanup_module(void)
     cdev_del(&aesd_device.cdev);
 
     if (mutex_lock_interruptible(&aesd_device.we_mutex))
-		return;
+		return -ERESTARTSYS;
     if (mutex_lock_interruptible(&aesd_device.cb_mutex))
-        return;
+        return -ERESTARTSYS;
     
-    PDEBUG("aesd_device.we.finished_entry.buffptr = %p", 
-        aesd_device.we.finished_entry.buffptr);
     AESD_CIRCULAR_BUFFER_FOREACH(e,&(aesd_device.cb),i) {
         kfree(e->buffptr);
     }
     kfree(aesd_device.we.buffptr);
-    /* Note that aesd_device.we.finished_entry.buffptr is not freed because it
-     * should be NULL outside the atomic write operations. Honestly, 
-     * finished_entry should be removed from aesd_device.we and a local 
-     * variable should be used instead.
-     */
 
+    
     unregister_chrdev_region(devno, 1);
 }
 
