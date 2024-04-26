@@ -54,7 +54,7 @@ struct aesd_dev
      */
     struct cdev cdev;                           /* Char device structure      */
     struct aesd_working_entry we;               /* Working entry */     
-    struct mutex * we_mutex;                    /* Locking primitive */
+    struct mutex we_mutex;                      /* Locking primitive */
 };
 
 #endif /* AESD_CHAR_DRIVER_AESDCHAR_H_ */

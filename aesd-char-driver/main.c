@@ -35,8 +35,7 @@ struct aesd_dev aesd_device = {
     .we.size = KMALLOC_MAX_SIZE,
     .we.index = 0,
     .we.complete = false,
-    .we.finished_entry = NULL,
-    .we_mutex = NULL
+    .we.finished_entry = NULL
 };
 void aesd_cleanup_module(void);
 
@@ -109,8 +108,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
      */
     PDEBUG("count = %lu, we.size = %lu", count, dev->we.size);
 
-    //if (mutex_lock_interruptible(&dev->we_mutex))
-	//	return -ERESTARTSYS;
+    if (mutex_lock_interruptible(&dev->we_mutex))
+		return -ERESTARTSYS;
     if(
         (count > dev->we.size) || 
         (count + dev->we.index + 1 > dev->we.size ) 
@@ -126,7 +125,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     retval = count;
 
     out:
-    //mutex_unlock(&dev->we_mutex)
+    mutex_unlock(&dev->we_mutex);
     return retval;
 }
 struct file_operations aesd_fops = {
@@ -168,12 +167,7 @@ int aesd_init_module(void)
 
     //memset(&aesd_device,0,sizeof(struct aesd_dev));
 
-    aesd_device.we_mutex = kzalloc(sizeof(struct mutex),GFP_KERNEL);
-    if(!aesd_device.we_mutex) {
-        result = -ENOMEM;
-        goto fail;
-    }
-    mutex_init(aesd_device.we_mutex);
+    mutex_init(&aesd_device.we_mutex);
 
     aesd_device.we.buffptr = kzalloc(KMALLOC_MAX_SIZE,GFP_KERNEL);
     if(!aesd_device.we.buffptr) {
@@ -208,7 +202,6 @@ void aesd_cleanup_module(void)
         kfree(aesd_device.we.finished_entry->buffptr);
         kfree(aesd_device.we.finished_entry);
     }
-    kfree(aesd_device.we_mutex);
 
     unregister_chrdev_region(devno, 1);
 }
