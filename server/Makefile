@@ -22,6 +22,9 @@ P=aesdsocket
 SOURCES= aesdsocket.c
 OBJECTS= $(SOURCES:.c=.o)
 
+USE_AESD_CHAR_DEVICE?= 1
+CCFLAGS+= -DUSE_AESD_CHAR_DEVICE=$(USE_AESD_CHAR_DEVICE)
+
 all: $(P)
 
 debug: CCFLAGS += -DDEBUG -g
