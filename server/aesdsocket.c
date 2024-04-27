@@ -146,10 +146,10 @@ int stopserver() {
     r = closesocket(server_descriptors->sfd);
     if(r) {return 1;}
     syslog(LOG_DEBUG, "closing data file %s", datapath);
-    closedatafile(server_descriptors->dfd);
+    r = closedatafile(server_descriptors->dfd);
     if(r) {return 1;}
     syslog(LOG_DEBUG, "deleting data file %s", datapath);
-    deletedatafile();
+    r = deletedatafile();
     if(r) {return 1;}
     syslog(LOG_DEBUG, "freeing global mallocs");
     pthread_mutex_destroy(server_descriptors->mutex);
