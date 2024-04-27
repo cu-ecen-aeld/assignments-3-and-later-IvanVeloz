@@ -57,13 +57,21 @@ int main(int argc, char *argv[]) {
 }
 
 int startserver(bool daemonize) {
+    int r;
     openlog("aesdsocket", LOG_CONS|LOG_PERROR|LOG_PID, LOG_USER);
-    syslog(LOG_DEBUG, "creating data file %s", datapath);
-    int r = createdatafile();
-    if(r) {
-        log_errno("main(): initializedatafile()");
-        syslog(LOG_ERR, "the return value was %i", r);
-        return 1;
+
+    syslog(LOG_DEBUG, "using data file %s", datapath);
+    if(!USE_AESD_CHAR_DEVICE) {
+        syslog(LOG_DEBUG, "creating data file %s", datapath);
+        r = createdatafile();
+        if(r) {
+            log_errno("main(): initializedatafile()");
+            syslog(LOG_ERR, "the return value was %i", r);
+            return 1;
+        }
+    }
+    else {
+        syslog(LOG_DEBUG, "Skipping creation of data file");
     }
 
     syslog(LOG_DEBUG, "opening data file %s", datapath);
@@ -111,16 +119,21 @@ int startserver(bool daemonize) {
     server_descriptors->sfd = sfd;
     pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
 
-    timestamp_descriptors = 
-        (struct timestamp_t *) malloc(sizeof(struct timestamp_t));
-    timestamp_descriptors->dfd = dfd;
-    timestamp_descriptors->dfdmutex = server_descriptors->mutex;
+    if(!USE_AESD_CHAR_DEVICE) {
+        timestamp_descriptors = 
+            (struct timestamp_t *) malloc(sizeof(struct timestamp_t));
+        timestamp_descriptors->dfd = dfd;
+        timestamp_descriptors->dfdmutex = server_descriptors->mutex;
 
-    syslog(LOG_DEBUG,"Ordering start timestamp");
-    r = pthread_create(&timestamp_descriptors->thread, NULL, timestampthread, timestamp_descriptors);
-    if(r) {
-        perror("startlistenthread(): pthread_create()");
-        return -1;
+        syslog(LOG_DEBUG,"Ordering start timestamp");
+        r = pthread_create(&timestamp_descriptors->thread, NULL, timestampthread, timestamp_descriptors);
+        if(r) {
+            perror("startlistenthread(): pthread_create()");
+            return -1;
+        }
+    }
+    else {
+        syslog(LOG_DEBUG,"Skipping start of timestamp thread");
     }
 
     syslog(LOG_DEBUG,"Ordering start of listenfunc");
@@ -137,10 +150,15 @@ int startserver(bool daemonize) {
 
 int stopserver() {
     int r;
-    syslog(LOG_DEBUG, "sending SIGTERM to timestampthread");
-    pthread_kill(timestamp_descriptors->thread, SIGINT);
-    syslog(LOG_DEBUG, "waiting for timestamp thread to exit");
-    r = pthread_join(timestamp_descriptors->thread, NULL);
+    if(!USE_AESD_CHAR_DEVICE) {
+        syslog(LOG_DEBUG, "sending SIGTERM to timestampthread");
+        pthread_kill(timestamp_descriptors->thread, SIGINT);
+        syslog(LOG_DEBUG, "waiting for timestamp thread to exit");
+        r = pthread_join(timestamp_descriptors->thread, NULL);
+    }
+    else {
+        syslog(LOG_DEBUG, "Skipping stop of timestamp thread");
+    }
     pthread_mutex_destroy(server_descriptors->mutex);
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     r = closesocket(server_descriptors->sfd);
@@ -148,9 +166,14 @@ int stopserver() {
     syslog(LOG_DEBUG, "closing data file %s", datapath);
     r = closedatafile(server_descriptors->dfd);
     if(r) {return 1;}
-    syslog(LOG_DEBUG, "deleting data file %s", datapath);
-    r = deletedatafile();
-    if(r) {return 1;}
+    if(!USE_AESD_CHAR_DEVICE) {
+        syslog(LOG_DEBUG, "deleting data file %s", datapath);
+        r = deletedatafile();        
+        if(r) {return 1;}
+    }
+    else {
+        syslog(LOG_DEBUG, "Skipping deletion of data file");
+    }
     syslog(LOG_DEBUG, "freeing global mallocs");
     pthread_mutex_destroy(server_descriptors->mutex);
     free(server_descriptors->mutex);

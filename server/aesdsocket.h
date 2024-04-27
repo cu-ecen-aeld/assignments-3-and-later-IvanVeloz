@@ -1,6 +1,16 @@
 #  define NI_MAXHOST      1025  //these should come from netdb.h but I can't
 #  define NI_MAXSERV      32    //seem to get the ifdef to work right away
 
+#ifndef USE_AESD_CHAR_DEVICE
+#   define USE_AESD_CHAR_DEVICE 0
+#endif
+
+#if USE_AESD_CHAR_DEVICE == 0
+#   define AESD_DATAPATH ("/var/tmp/aesdsocketdata")
+#else
+#   define AESD_DATAPATH ("/dev/aesdchar")
+#endif
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
@@ -36,7 +46,7 @@ volatile bool flag_accepting_connections = false;
 volatile bool flag_idling_main_thread = false;
 volatile int  last_signal_caught = 0;
 
-const char datapath[PATH_MAX] = "/var/tmp/aesdsocketdata";
+const char datapath[PATH_MAX] = AESD_DATAPATH;
 
 struct descriptors_t {
     pthread_mutex_t *mutex;
