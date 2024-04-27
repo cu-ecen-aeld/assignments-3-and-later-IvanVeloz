@@ -72,7 +72,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     PDEBUG("the current process is \"%s\" (pid %i)\n", 
         current->comm, current->pid);
-    PDEBUG("the index is %lu\n", dev->we.index);
     PDEBUG("read %zu bytes with offset %lld\n",count,*f_pos);
     
     if (mutex_lock_interruptible(&dev->cb_mutex))
@@ -96,9 +95,10 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         j==0 || i != dev->cb.in_offs; 
         ++j, aesd_circular_increment(&i,AESDCHAR_MAX_INDEX)
     ) {
+        // Ignores everything before the starting_entry that we found earlier.
         if(sent_count > 0 || (&(dev->cb.entry[i]) == starting_entry) ) {
             
-            size_t n = (sent_count + n > count)? 
+            size_t n = (sent_count + dev->cb.entry[i].size > count)? 
                 count - sent_count : dev->cb.entry[i].size;
             const char * p = dev->cb.entry[i].buffptr;
 
@@ -106,12 +106,17 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
             n = (sent_count > 0)? n : n - starting_entry_offset;
             p = (sent_count > 0)? p : p + starting_entry_offset;
 
+            PDEBUG("copy_to_user(buf = %p, p = %p, n = %lu)", buf, p, n);
+            PDEBUG("Entry reads %s\n", p);
             if (copy_to_user(buf, p, n)) {
                 retval = -EFAULT;
                 goto out;
             }
             sent_count += n;
             *f_pos += n;
+            retval = sent_count;
+            PDEBUG("sent_count = %lu",sent_count);
+            goto out;
         }
     }
     out:
@@ -172,18 +177,36 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     for(; s < dev->we.index; s++) {
         if(dev->we.buffptr[s] == '\n') {
             const char *retbuffptr;
+            char * b;
             PDEBUG("Found \\n at index %lu; adding entry now\n",s);
             dev->we.complete = true;
-            finished_entry.buffptr = 
-                kzalloc(s+2, GFP_KERNEL);   // +2 to fit null terminator
-                
-            if (mutex_lock_interruptible(&dev->cb_mutex))
-		        return -ERESTARTSYS;
+
+            // +2 because we count form 0 and want one extra for Nul termination
+            b = kzalloc(s+2, GFP_KERNEL);
+            if(!b) {
+                retval = -ENOMEM;
+                goto out;
+            }
+            for(size_t i=0; i<s+1; i++) {
+                b[i] = dev->we.buffptr[i];
+            }
+            b[s+1] = '\0';
+            // Null is hidden from normal operation, for debugging with printk()
+
+            finished_entry.buffptr = b;
+            finished_entry.size = s+1;
+
+            if (mutex_lock_interruptible(&dev->cb_mutex)) {
+		        retval = -ERESTARTSYS;
+                goto out;
+            }
             retbuffptr = aesd_circular_buffer_add_entry(
                     &(dev->cb), 
                     &(finished_entry) );
             PDEBUG("Entered buffptr %p to circular buffer\n", 
                 finished_entry.buffptr);
+            PDEBUG("String reads back %s\n", 
+            finished_entry.buffptr);
             PDEBUG("Freeing retbuffptr %p\n", retbuffptr);
             kfree(retbuffptr);
             mutex_unlock(&dev->cb_mutex);
@@ -273,19 +296,18 @@ void aesd_cleanup_module(void)
 
     cdev_del(&aesd_device.cdev);
 
-    while (mutex_lock_interruptible(&aesd_device.we_mutex)) {
-        printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!\n");
-    }
-    kfree(aesd_device.we.buffptr);
-    while (mutex_lock_interruptible(&aesd_device.cb_mutex)) {
-        printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!\n"); 
-    }
+    //while (mutex_lock_interruptible(&aesd_device.we_mutex)) {
+    //    printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!\n");
+    //}
+    //while (mutex_lock_interruptible(&aesd_device.cb_mutex)) {
+    //    printk( KERN_CRIT "aesdchar: " "Failed to get lock for aesd_device.cb_mutex; can't clean up module!!!\n"); 
+    //}
     AESD_CIRCULAR_BUFFER_FOREACH(e,&(aesd_device.cb),i) {
         kfree(e->buffptr);
     }
     kfree(aesd_device.we.buffptr);
-    mutex_unlock(&aesd_device.we_mutex);
-    mutex_unlock(&aesd_device.cb_mutex);
+    //mutex_unlock(&aesd_device.we_mutex);
+    //mutex_unlock(&aesd_device.cb_mutex);
     
     unregister_chrdev_region(devno, 1);
 }
