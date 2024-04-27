@@ -66,14 +66,57 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 {
     ssize_t retval = 0;
     struct aesd_dev *dev = filp->private_data;
+    struct aesd_buffer_entry * starting_entry = NULL;
+    size_t starting_entry_offset = 0;
+    size_t sent_count = 0;
 
     PDEBUG("the current process is \"%s\" (pid %i)\n", 
         current->comm, current->pid);
     PDEBUG("the index is %lu\n", dev->we.index);
     PDEBUG("read %zu bytes with offset %lld\n",count,*f_pos);
-    /**
-     * TODO: handle read
-     */
+    
+    if (mutex_lock_interruptible(&dev->cb_mutex))
+        return -ERESTARTSYS;
+
+    // Get the buffer we will start reading from
+    starting_entry = aesd_circular_buffer_find_entry_offset_for_fpos(
+        &dev->cb,
+        (size_t)(*f_pos),
+        &starting_entry_offset);
+    if(starting_entry == NULL) {
+        goto out;
+    }
+
+    // Iterate through the circular buffer until we get to in_offs, which
+    // is as far as we have written to the buffer. 
+    // j handles "full buffer" edge case (lets it run the first time)
+    // and is a handy counter.
+    for(
+        uint8_t j = 0, i = dev->cb.out_offs; 
+        j==0 || i != dev->cb.in_offs; 
+        ++j, aesd_circular_increment(&i,AESDCHAR_MAX_INDEX)
+    ) {
+        if(sent_count > 0 || (&(dev->cb.entry[i]) == starting_entry) ) {
+            
+            size_t n = (sent_count + n > count)? 
+                count - sent_count : dev->cb.entry[i].size;
+            const char * p = dev->cb.entry[i].buffptr;
+
+            // Apply the starting entry offset if necessary
+            n = (sent_count > 0)? n : n - starting_entry_offset;
+            p = (sent_count > 0)? p : p + starting_entry_offset;
+
+            if (copy_to_user(buf, p, n)) {
+                retval = -EFAULT;
+                goto out;
+            }
+            sent_count += n;
+            *f_pos += n;
+        }
+    }
+    out:
+    mutex_unlock(&dev->cb_mutex);
+    
     return retval;
 }
 
