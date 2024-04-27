@@ -68,7 +68,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     struct aesd_dev *dev = filp->private_data;
     struct aesd_buffer_entry * starting_entry = NULL;
     size_t starting_entry_offset = 0;
-    size_t sent_count = 0;
 
     PDEBUG("the current process is \"%s\" (pid %i)\n", 
         current->comm, current->pid);
@@ -96,15 +95,15 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
         ++j, aesd_circular_increment(&i,AESDCHAR_MAX_INDEX)
     ) {
         // Ignores everything before the starting_entry that we found earlier.
-        if(sent_count > 0 || (&(dev->cb.entry[i]) == starting_entry) ) {
+        if( &(dev->cb.entry[i]) == starting_entry ) {
             
-            size_t n = (sent_count + dev->cb.entry[i].size > count)? 
-                count - sent_count : dev->cb.entry[i].size;
+            size_t n = (dev->cb.entry[i].size > count)? 
+                count : dev->cb.entry[i].size;
             const char * p = dev->cb.entry[i].buffptr;
 
-            // Apply the starting entry offset if necessary
-            n = (sent_count > 0)? n : n - starting_entry_offset;
-            p = (sent_count > 0)? p : p + starting_entry_offset;
+            // Apply the starting entry offsets
+            n -= starting_entry_offset;
+            p += starting_entry_offset;
 
             PDEBUG("copy_to_user(buf = %p, p = %p, n = %lu)", buf, p, n);
             PDEBUG("Entry reads %s\n", p);
@@ -112,10 +111,9 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 retval = -EFAULT;
                 goto out;
             }
-            sent_count += n;
             *f_pos += n;
-            retval = sent_count;
-            PDEBUG("sent_count = %lu",sent_count);
+            retval = n;
+            PDEBUG("sent %lu bytes",n);
             goto out;
         }
     }
