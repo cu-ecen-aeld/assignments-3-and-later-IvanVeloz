@@ -58,6 +58,8 @@ extern const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *b
 
 extern void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer);
 
+extern bool aesd_circular_increment(uint8_t *index, uint8_t max_index);
+
 /**
  * Create a for loop to iterate over each member of the circular buffer.
  * Useful when you've allocated memory for circular buffer entries and need to free it

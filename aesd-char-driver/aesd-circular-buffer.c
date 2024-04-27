@@ -36,8 +36,6 @@
 
 #include "aesd-circular-buffer.h"
 
-static bool aesd_circular_increment(uint8_t *index, uint8_t max_index);
-
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
  * @param char_offset the position to search for in the buffer list, describing the zero referenced
@@ -140,7 +138,7 @@ void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
  * overflow is considered to have ocurred.
  * @return true if an overflow ocurred, else returns false.
  */
-static bool aesd_circular_increment(uint8_t *index, uint8_t max_index) {
+bool aesd_circular_increment(uint8_t *index, uint8_t max_index) {
     
     if(*index >= max_index) {
         *index = 0;
