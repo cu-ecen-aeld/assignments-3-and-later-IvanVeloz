@@ -67,23 +67,7 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
     loff_t retval = 0;
     struct aesd_dev *dev = filp->private_data;
 
-    switch(whence) {
-    case SEEK_SET: 
-        retval = off; 
-        break;
-    case SEEK_CUR: 
-        retval = filp->f_pos + off; 
-        break;
-    case SEEK_END: 
-        if (mutex_lock_interruptible(&dev->cb_mutex))
-            return -ERESTARTSYS;
-        retval = dev->cb_size + off;
-        mutex_unlock(&dev->cb_mutex);
-        break;
-    default: 
-        return -EINVAL;
-    }
-
+    fixed_size_llseek(filp, off, whence, dev->cb_size);
     if (retval < 0) return -EINVAL;
 
     filp->f_pos = retval;
