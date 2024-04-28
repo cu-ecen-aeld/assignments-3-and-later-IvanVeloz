@@ -22,6 +22,7 @@
 #include <linux/uaccess.h>	// copy_*_user
 #include "aesdchar.h"
 #include "aesd-circular-buffer.h"
+#include "aesd_ioctl.h"
 
 #define KMALLOC_MAX_SIZE      (1UL << KMALLOC_SHIFT_MAX) /* = 4194304 on my PC*/
 
@@ -70,6 +71,44 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
     fixed_size_llseek(filp, off, whence, dev->cb_size);
     if (retval < 0) return -EINVAL;
 
+    return retval;
+}
+
+static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
+    unsigned int write_cmd_offset)
+{
+    ssize_t retval = 0;
+    struct aesd_dev *dev = filp->private_data;
+    loff_t fp = 0;
+
+    if (mutex_lock_interruptible(&dev->cb_mutex))
+        return -ERESTARTSYS;
+
+    if(write_cmd_offset > dev->cb.entry[write_cmd].size) return -EINVAL;
+    for(int i; i<AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED && i<write_cmd; i++) {
+        fp += (loff_t)dev->cb.entry[i].size;
+    }
+    mutex_unlock(&dev->cb_mutex);
+    fp += write_cmd_offset;
+
+    return retval;
+}
+
+long aesd_ioctl(struct file *filp, unsigned int cmd, struct aesd_seekto * st)
+{
+	int retval = 0;
+
+	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
+	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
+
+    switch(cmd) {
+        case AESDCHAR_IOCSEEKTO:
+            retval = aesd_adjust_file_offset(filp, st->write_cmd, 
+                                          st->write_cmd_offset);
+            break;
+        default:
+            return -ENOTTY;
+    }
     return retval;
 }
 
@@ -256,7 +295,8 @@ struct file_operations aesd_fops = {
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
-    .llseek =   aesd_llseek
+    .llseek =   aesd_llseek,
+    .unlockes_ioctl = aesd_ioctl
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
