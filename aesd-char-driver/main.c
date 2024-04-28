@@ -259,7 +259,7 @@ int aesd_init_module(void)
         return result;
     }
 
-    //memset(&aesd_device,0,sizeof(struct aesd_dev));
+    memset(&aesd_device,0,sizeof(struct aesd_dev));
 
     mutex_init(&aesd_device.we_mutex);
     mutex_init(&aesd_device.cb_mutex);
