@@ -254,6 +254,7 @@ struct file_operations aesd_fops = {
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .llseek =   aesd_llseek
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
