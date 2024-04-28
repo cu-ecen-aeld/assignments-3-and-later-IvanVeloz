@@ -36,6 +36,7 @@ struct aesd_dev aesd_device = {
     .we.size = KMALLOC_MAX_SIZE,
     .we.index = 0,
     .we.complete = false,
+    .cb_size = 0
 };
 void aesd_cleanup_module(void);
 
@@ -59,6 +60,34 @@ int aesd_release(struct inode *inode, struct file *filp)
     filp->private_data = dev; /* for other methods */
 
     return 0;
+}
+
+loff_t aesd_llseek(struct file *filp, loff_t off, int whence) 
+{
+    loff_t retval = 0;
+    struct aesd_dev *dev = filp->private_data;
+
+    switch(whence) {
+    case SEEK_SET: 
+        retval = off; 
+        break;
+    case SEEK_CUR: 
+        retval = filp->f_pos + off; 
+        break;
+    case SEEK_END: 
+        if (mutex_lock_interruptible(&dev->cb_mutex))
+            return -ERESTARTSYS;
+        retval = dev->cb_size + off;
+        mutex_unlock(&dev->cb_mutex);
+        break;
+    default: 
+        return -EINVAL;
+    }
+
+    if (retval < 0) return -EINVAL;
+
+    filp->f_pos = retval;
+    return retval;
 }
 
 ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
@@ -177,7 +206,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     
     for(; s < dev->we.index; s++) {
         if(dev->we.buffptr[s] == '\n') {
-            const char *retbuffptr;
+            const char *oldbuffptr;
+            size_t oldsize;
             char * b;
             PDEBUG("Found \\n at index %lu; adding entry now\n",s);
             dev->we.complete = true;
@@ -201,15 +231,24 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 		        retval = -ERESTARTSYS;
                 goto out;
             }
-            retbuffptr = aesd_circular_buffer_add_entry(
+
+            oldsize = dev->cb.entry[dev->cb.in_offs].size;  // must go first
+            oldbuffptr = aesd_circular_buffer_add_entry(    // must go second
                     &(dev->cb), 
-                    &(finished_entry) );
+                    &(finished_entry) 
+                );
+            
+            PDEBUG("returned size was %lu, finished_entry.size is %lu", oldsize,
+            finished_entry.size);
+            dev->cb_size += finished_entry.size - oldsize;
+
             PDEBUG("Entered buffptr %p to circular buffer\n", 
                 finished_entry.buffptr);
-            PDEBUG("String reads back %s\n", 
-            finished_entry.buffptr);
-            PDEBUG("Freeing retbuffptr %p\n", retbuffptr);
-            kfree(retbuffptr);
+            PDEBUG("String reads back %s\n", finished_entry.buffptr);
+            PDEBUG("Size of the circular buffer now is %lu\n", dev->cb_size);
+            PDEBUG("Freeing oldbuffptr %p\n", oldbuffptr);
+            
+            kfree(oldbuffptr);
             mutex_unlock(&dev->cb_mutex);
 
             dev->we.index = 0;

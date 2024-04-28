@@ -52,6 +52,7 @@ struct aesd_dev
     struct aesd_working_entry we;               /* Working entry */     
     struct mutex we_mutex;                      /* Locking primitive */
     struct aesd_circular_buffer cb;             /* Circular buffer */
+    ssize_t cb_size;                            /* size */
     struct mutex cb_mutex;                      /* Locking primitive */
 };
 
