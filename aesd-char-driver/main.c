@@ -70,7 +70,6 @@ loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
     fixed_size_llseek(filp, off, whence, dev->cb_size);
     if (retval < 0) return -EINVAL;
 
-    filp->f_pos = retval;
     return retval;
 }
 
@@ -109,14 +108,17 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     ) {
         // Ignores everything before the starting_entry that we found earlier.
         if( &(dev->cb.entry[i]) == starting_entry ) {
-            
-            size_t n = (dev->cb.entry[i].size > count)? 
-                count : dev->cb.entry[i].size;
-            const char * p = dev->cb.entry[i].buffptr;
 
-            // Apply the starting entry offsets
-            n -= starting_entry_offset;
-            p += starting_entry_offset;
+            size_t n;
+            const char * p;
+            if(count > dev->cb.entry[i].size - starting_entry_offset) {
+                n = dev->cb.entry[i].size - starting_entry_offset;
+                p = dev->cb.entry[i].buffptr + starting_entry_offset;
+            }
+            else {
+                n = count;
+                p = dev->cb.entry[i].buffptr + starting_entry_offset;
+            }
 
             PDEBUG("copy_to_user(buf = %p, p = %p, n = %lu)", buf, p, n);
             PDEBUG("Entry reads %s\n", p);
