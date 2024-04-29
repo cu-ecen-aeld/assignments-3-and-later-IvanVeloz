@@ -16,13 +16,13 @@
 #include <stdio.h>
 #endif
 
-#define SCULL_DEBUG
+//#define SCULL_DEBUG
 
 #undef PDEBUG
 #ifdef SCULL_DEBUG
 #   ifdef __KERNEL__
     /* This one if debugging is on, and kernel space */
-#   define PDEBUG(fmt, args...) printk( KERN_DEBUG "scull: " fmt, ## args)
+#   define PDEBUG(fmt, args...) printk( KERN_DEBUG "aesc-circular-buffer: " fmt, ## args)
 #   else
     /* This one is for user space */
 #   define PDEBUG(fmt, args...) fprintf(stderr, fmt, ## args)
