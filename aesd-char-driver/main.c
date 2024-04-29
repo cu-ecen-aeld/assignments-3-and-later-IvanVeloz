@@ -94,17 +94,22 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     return retval;
 }
 
-long aesd_ioctl(struct file *filp, unsigned int cmd, struct aesd_seekto * st)
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int retval = 0;
-
+    struct aesd_seekto * st;
 	if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) return -ENOTTY;
 	if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) return -ENOTTY;
 
     switch(cmd) {
         case AESDCHAR_IOCSEEKTO:
-            retval = aesd_adjust_file_offset(filp, st->write_cmd, 
+            if(copy_from_user(&st, (const void __user *)arg, sizeof(st))) {
+                retval = EFAULT;
+            }
+            else {
+                retval = aesd_adjust_file_offset(filp, st->write_cmd, 
                                           st->write_cmd_offset);
+            }
             break;
         default:
             return -ENOTTY;
