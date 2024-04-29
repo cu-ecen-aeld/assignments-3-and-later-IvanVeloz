@@ -96,7 +96,7 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     mutex_unlock(&dev->cb_mutex);
     fp += write_cmd_offset;
     filp->f_pos = fp;
-    PDEBUG("filp->f_pos = %llu", fp);
+    PDEBUG("f_pos = %llu", fp);
 
     return retval;
 }
@@ -148,7 +148,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     // Get the buffer we will start reading from
     starting_entry = aesd_circular_buffer_find_entry_offset_for_fpos(
         &dev->cb,
-        (size_t)(filp->f_pos),
+        (size_t)(*f_pos),
         &starting_entry_offset);
     if(starting_entry == NULL) {
         goto out;
@@ -183,7 +183,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 retval = -EFAULT;
                 goto out;
             }
-            *f_pos = filp->f_pos + n;
+            *f_pos += n;
             retval = n;
             PDEBUG("sent %lu bytes",n);
             goto out;
@@ -240,14 +240,14 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
     if((s = copy_from_user((dev->we.buffptr + dev->we.index), buf, count))) {
         dev->we.index += count - s;
-        *f_pos = filp->f_pos + count - s;
+        *f_pos += count - s;
         retval = -EFAULT;
         goto out;
     }
     
     s = dev->we.index;
     dev->we.index += count;
-    *f_pos = filp->f_pos + count;
+    *f_pos += count;
     
     for(; s < dev->we.index; s++) {
         if(dev->we.buffptr[s] == '\n') {
