@@ -84,7 +84,7 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     if (mutex_lock_interruptible(&dev->cb_mutex))
         return -ERESTARTSYS;
 
-    if(write_cmd_offset > dev->cb.entry[write_cmd].size) return -EINVAL;
+    if(write_cmd_offset+1 > dev->cb.entry[write_cmd].size) return -EINVAL;
     for(int i; i<AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED && i<write_cmd; i++) {
         fp += (loff_t)dev->cb.entry[i].size;
     }
