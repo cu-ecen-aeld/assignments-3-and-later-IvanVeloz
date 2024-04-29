@@ -99,3 +99,4 @@ void log_gai(const char *funcname, int errcode);
 static void signal_handler(int signo);
 ssize_t find_ioc_command(const void * buf, int buf_len);
 struct aesd_seekto * parse_ioc_command(const void * buf, size_t startpos);
+ssize_t find_eoc(const void * buf, int buf_len, size_t ioc_command_pos);

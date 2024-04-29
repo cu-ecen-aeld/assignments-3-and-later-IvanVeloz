@@ -336,6 +336,7 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
             /* send ioc command */
             ioctl(dfd, AESDCHAR_IOCSEEKTO, seekto);
             free(seekto);
+            readcount = ioccmdpos;
         }
 
         do {
@@ -349,12 +350,14 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
             log_errno("appenddata(): data write()");
             goto errorcleanup;
         }
+        /* Case removed to allow command evaluation
         else if(writecount < readcount) {
             syslog(LOG_ERR, "appenddata(): write(): %m");
             syslog(LOG_ERR, "caused by writecount=%li < readcount=%li", (
                     long unsigned) writecount, (long unsigned) readcount);
             goto errorcleanup;
         }
+        */
         if(readcount < buf_len) {
         // Read all of the datafile and write into the socket
             for(int pos=0,rc=-1; rc!=0; pos += rc) {
@@ -634,4 +637,13 @@ struct aesd_seekto * parse_ioc_command(const void * buf, size_t startpos)
     sscanf(buf, AESD_SOCKET_IOC_STRING ":%" PRIu32 ",%" PRIu32 "\n",
         &r->write_cmd, &r->write_cmd_offset);
     return r;
+}
+
+ssize_t find_eoc(const void * buf, int buf_len, size_t ioc_command_pos)
+{
+    size_t s;
+    for(s=ioc_command_pos; s<buf_len; s++) {
+        if(*((char *)(buf+s)) == '\n') return s;
+    }
+    return -ENOENT;
 }
