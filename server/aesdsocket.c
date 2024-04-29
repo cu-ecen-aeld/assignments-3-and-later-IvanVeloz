@@ -77,13 +77,6 @@ int startserver(bool daemonize) {
         syslog(LOG_DEBUG, "Skipping creation of data file");
     }
 
-    syslog(LOG_DEBUG, "opening data file %s", datapath);
-    int dfd = opendatafile();
-    if( dfd == -1 ) {
-        log_errno("main(): opendatafile()");
-        return 1;
-    }
-
     syslog(LOG_DEBUG, "opening socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     int sfd = opensocket();
     if( sfd == -1 ) {
@@ -118,11 +111,17 @@ int startserver(bool daemonize) {
     server_descriptors = 
         (struct descriptors_t *) malloc(sizeof(struct descriptors_t));
     server_descriptors->mutex = malloc(sizeof(pthread_mutex_t));
-    server_descriptors->dfd = dfd;
+    //server_descriptors->dfd = dfd;
     server_descriptors->sfd = sfd;
     pthread_mutex_init(server_descriptors->mutex, PTHREAD_MUTEX_NORMAL);
 
     if(!USE_AESD_CHAR_DEVICE) {
+        syslog(LOG_DEBUG, "opening data file for timestamping %s", datapath);
+        int dfd = opendatafile();
+        if( dfd == -1 ) {
+            log_errno("main(): opendatafile()");
+            return 1;
+        }
         timestamp_descriptors = 
             (struct timestamp_t *) malloc(sizeof(struct timestamp_t));
         timestamp_descriptors->dfd = dfd;
@@ -142,7 +141,6 @@ int startserver(bool daemonize) {
     syslog(LOG_DEBUG,"Ordering start of listenfunc");
 
     r = listenfunc( server_descriptors->sfd, 
-                    server_descriptors->dfd,
                     server_descriptors->mutex);
     if(r) {
         log_errno("main(): startlistenthread()");
@@ -166,9 +164,6 @@ int stopserver() {
     syslog(LOG_DEBUG, "closing socket %s:%s", aesd_netparams.ip, aesd_netparams.port);
     r = closesocket(server_descriptors->sfd);
     if(r) {return 1;}
-    syslog(LOG_DEBUG, "closing data file %s", datapath);
-    r = closedatafile(server_descriptors->dfd);
-    if(r) {return 1;}
     if(!USE_AESD_CHAR_DEVICE) {
         syslog(LOG_DEBUG, "deleting data file %s", datapath);
         r = deletedatafile();        
@@ -189,16 +184,15 @@ int stopserver() {
 void *listenthread(void *thread_param) {
     struct descriptors_t *desc = (struct descriptors_t *)thread_param;
     int sfd = desc->sfd;
-    int dfd = desc->dfd;
     pthread_mutex_t *dfdmutex = desc->mutex;
     syslog(LOG_DEBUG,"listenthread is alive");
-    listenfunc(sfd, dfd, dfdmutex);   //it's nice getting out of pointer-land, mostly
+    listenfunc(sfd, dfdmutex);   //it's nice getting out of pointer-land, mostly
     return thread_param;
 }
 
-int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
+int listenfunc(int sfd, pthread_mutex_t *dfdmutex) {
     int r;
-    syslog(LOG_DEBUG, "acceptconnection sfd = %i; dfd = %i",sfd,dfd);
+    syslog(LOG_DEBUG, "acceptconnection sfd = %i",sfd);
     flag_accepting_connections = true;
     int rsfd;   //receiving socket-file-descriptor
     struct sockaddr_storage client_addr;
@@ -219,7 +213,6 @@ int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
         poll(&sfd_poll,1,POLL_TIMEOUT_MS);
         if(!(sfd_poll.revents&(POLLIN|POLLPRI)))
             continue;
-
         rsfd = accept(sfd,(struct sockaddr *)&client_addr,&client_addr_len);
         if(rsfd == -1) {
             log_errno("listenfunc(): accept()");
@@ -245,7 +238,6 @@ int listenfunc(int sfd, int dfd, pthread_mutex_t *dfdmutex) {
         }
 
         append_inst->rsfd = rsfd;
-        append_inst->dfd = dfd;
         append_inst->dfdmutex = dfdmutex;
         r = pthread_create(&append_inst->thread, NULL, appenddatathread, append_inst);
         TAILQ_INSERT_TAIL(&append_head,append_inst,nodes);
@@ -289,7 +281,7 @@ int startlistenthread(pthread_t *thread, struct descriptors_t *descriptors) {
 
 void *appenddatathread(void *thread_param) {
     struct append_t  * d = (struct append_t *)thread_param;
-    d->ret = appenddata(d->rsfd, d->dfd, d->dfdmutex);
+    d->ret = appenddata(d->rsfd, d->dfdmutex);
     closesocket(d->rsfd);
     #ifdef __DEBUG_MESSAGES
     syslog(LOG_DEBUG,"Closed file descriptor #%i",d->rsfd);
@@ -297,7 +289,7 @@ void *appenddatathread(void *thread_param) {
     return thread_param;
 }
 
-int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
+int appenddata(int rsfd, pthread_mutex_t *dfdmutex) {
 
     int r = -1;
     int buf_len = 1024;  //arbitrary
@@ -312,6 +304,12 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
     };
     struct timespec timeout;
     // Read the socket and write into datafile
+
+    int dfd = opendatafile();
+        if( dfd == -1 ) {
+            log_errno("appenddata(): opendatafile()");
+            goto dfderrorcleanup;
+    }
 
     while(flag_accepting_connections) {
 
@@ -391,6 +389,9 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
 
     r = 0;
     errorcleanup:
+    syslog(LOG_DEBUG, "closing data file %s", datapath);
+    robustclose(dfd);
+    dfderrorcleanup:
     free(buf);
     return r;
 }
