@@ -18,8 +18,11 @@
 #include <poll.h>
 #include <pthread.h>
 #include <sys/queue.h>
+#include <inttypes.h>
+#include <sys/ioctl.h>
 
 #include "aesdsocket.h"
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define POLL_TIMEOUT_MS     20
 #define TIMESTAMP_MAX_SIZE  100
@@ -300,6 +303,8 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
     int buf_len = 1024;  //arbitrary
     void *buf = malloc(buf_len+1);
     size_t readcount, writecount;
+    struct aesd_seekto * seekto;
+
     struct pollfd rsfd_poll = { 
         .fd = rsfd, 
         .events  = POLLIN|POLLPRI, 
@@ -322,6 +327,15 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
         else if (readcount == 0) {
             syslog(LOG_DEBUG,"appenddata received FIN from client");
             break;
+        }
+
+        
+        ssize_t ioccmdpos = find_ioc_command(buf, buf_len);
+        if(ioccmdpos >= 0) {
+            seekto = parse_ioc_command(buf, ioccmdpos);
+            /* send ioc command */
+            ioctl(dfd, AESDCHAR_IOCSEEKTO, seekto);
+            free(seekto);
         }
 
         do {
@@ -587,4 +601,37 @@ static void signal_handler(int signo) {
         default:
             last_signal_caught = signo;
     }
+}
+
+/* Finds the AESD_SOCKET_IOC_STRING in a given file buffer
+ * @param buf is the buffer to check.
+ * @param buf_len is the length of the buffer.
+ * @returns The starting position, that is the position of the first character 
+ * of the command string. If no entry is found, -ENOENT is returned.
+ */
+ssize_t find_ioc_command(const void * buf, int buf_len) {
+    size_t s = sizeof(AESD_SOCKET_IOC_STRING) - 1; // removing NULL termination
+    if(s > buf_len) return -ENOENT;
+    for(size_t i = 0; i < buf_len - s; i++) {
+        if( !memcmp(AESD_SOCKET_IOC_STRING, buf, s) ) 
+            return i;
+    }
+    return -ENOENT;
+}
+/* Parses the information from an AESDCHAR_IOCSEEKTO command into an
+ * aesd_seekto structure. The command has the format `AESDCHAR_IOCSEEKTO:X,Y`,
+ * where X is put into write_cmd and Y is put into write_cmd_offset. The command
+ * is expected to end in a newline.
+ * The user is responsible for freeing the memory allocated for the return 
+ * value.
+ * @param buf is the buffer containing the command string.
+ * @param startpos is the starting position, that is the position of the first
+ * character of the command string.
+ */
+struct aesd_seekto * parse_ioc_command(const void * buf, size_t startpos) 
+{
+    struct aesd_seekto * r = malloc(sizeof(struct aesd_seekto));
+    sscanf(buf, AESD_SOCKET_IOC_STRING ":%" PRIu32 ",%" PRIu32 "\n",
+        &r->write_cmd, &r->write_cmd_offset);
+    return r;
 }

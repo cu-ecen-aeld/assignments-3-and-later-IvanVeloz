@@ -18,6 +18,8 @@
 #include <linux/limits.h>
 #include <pthread.h>
 
+#define AESD_SOCKET_IOC_STRING "AESDCHAR_IOCSEEKTO"
+
 struct socket_params {
     char *port;
     char *ip;
@@ -95,3 +97,5 @@ int robustclose(int fd);
 void log_errno(const char *funcname);
 void log_gai(const char *funcname, int errcode);
 static void signal_handler(int signo);
+ssize_t find_ioc_command(const void * buf, int buf_len);
+struct aesd_seekto * parse_ioc_command(const void * buf, size_t startpos);
