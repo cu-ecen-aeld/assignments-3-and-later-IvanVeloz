@@ -87,16 +87,16 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     if(write_cmd_offset+1 > dev->cb.entry[write_cmd].size) return -EINVAL;
     if(write_cmd+1 > AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) return -EINVAL;
 
-    for(uint8_t i = 0;
+    for(uint8_t i = 0, j=dev->cb.out_offs;
         i < write_cmd; 
-        ++i, aesd_circular_increment(&dev->cb.out_offs,AESDCHAR_MAX_INDEX)
+        ++i, aesd_circular_increment(&j,AESDCHAR_MAX_INDEX)
     ) {
-        fp += (loff_t)dev->cb.entry[dev->cb.out_offs].size;
+        fp += (loff_t)dev->cb.entry[j].size;
     }
     mutex_unlock(&dev->cb_mutex);
     fp += write_cmd_offset;
     filp->f_pos = fp;
-    PDEBUG("f_pos = %llu", fp);
+    PDEBUG("adjusted filp->f_pos  to %llu", fp);
 
     return retval;
 }
@@ -137,9 +137,9 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     struct aesd_buffer_entry * starting_entry = NULL;
     size_t starting_entry_offset = 0;
 
-    PDEBUG("the current process is \"%s\" (pid %i)\n", 
-        current->comm, current->pid);
-    PDEBUG("read %zu bytes with offset %lld\n",count,*f_pos);
+    //PDEBUG("the current process is \"%s\" (pid %i)\n", 
+    //    current->comm, current->pid);
+    //PDEBUG("read %zu bytes with offset %lld\n",count,*f_pos);
     PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
     
     if (mutex_lock_interruptible(&dev->cb_mutex))
@@ -153,7 +153,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     if(starting_entry == NULL) {
         goto out;
     }
-
+    PDEBUG("Starting entry is %s", starting_entry->buffptr);
     // Iterate through the circular buffer until we get to in_offs, which
     // is as far as we have written to the buffer. 
     // j handles "full buffer" edge case (lets it run the first time)
@@ -177,7 +177,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 p = dev->cb.entry[i].buffptr + starting_entry_offset;
             }
 
-            PDEBUG("copy_to_user(buf = %p, p = %p, n = %lu)", buf, p, n);
+            //PDEBUG("copy_to_user(buf = %p, p = %p, n = %lu)", buf, p, n);
             PDEBUG("Entry reads %s\n", p);
             if (copy_to_user(buf, p, n)) {
                 retval = -EFAULT;
@@ -185,7 +185,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
             }
             *f_pos += n;
             retval = n;
-            PDEBUG("sent %lu bytes",n);
+            //PDEBUG("sent %lu bytes",n);
             goto out;
         }
     }
@@ -208,18 +208,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
     PDEBUG("write %zu bytes with offset %lld\n",count,*f_pos);
     PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
-
-    /**
-     * TODO: handle write
-     */
-    /* 1. Write to the working entry, and don't mark it as complete until this
-     * functions sees a /n. 
-     * 2. When the working entry is complete, pass it to 
-     * aesd_circular_buffer_add_entry.
-     * 3. Free the memory returned by aesd_circular_buffer_add_entry.
-     * 4. Allocate new memory for 
-     */
-    /* 
+    /*
      * Write to the circular buffer.
      * If buffer becomes full, free the memory from the entry you are going to 
      * overwrite _before_ you overwrite that entry. Return a pointer to the
@@ -283,15 +272,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                     &(finished_entry) 
                 );
             
-            PDEBUG("returned size was %lu, finished_entry.size is %lu", oldsize,
-            finished_entry.size);
+            //PDEBUG("returned size was %lu, finished_entry.size is %lu", oldsize,
+            //finished_entry.size);
             dev->cb_size += finished_entry.size - oldsize;
 
-            PDEBUG("Entered buffptr %p to circular buffer\n", 
-                finished_entry.buffptr);
-            PDEBUG("String reads back %s\n", finished_entry.buffptr);
-            PDEBUG("Size of the circular buffer now is %lu\n", dev->cb_size);
-            PDEBUG("Freeing oldbuffptr %p\n", oldbuffptr);
+            //PDEBUG("Entered buffptr %p to circular buffer\n", 
+            //    finished_entry.buffptr);
+            //PDEBUG("String reads back %s\n", finished_entry.buffptr);
+            //PDEBUG("Size of the circular buffer now is %lu\n", dev->cb_size);
+            //PDEBUG("Freeing oldbuffptr %p\n", oldbuffptr);
             
             kfree(oldbuffptr);
             mutex_unlock(&dev->cb_mutex);
@@ -305,7 +294,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     retval = count;
 
     out:
-    PDEBUG("Index is at %lu\n", dev->we.index);
+    //PDEBUG("Index is at %lu\n", dev->we.index);
     mutex_unlock(&dev->we_mutex);
     return retval;
 }
