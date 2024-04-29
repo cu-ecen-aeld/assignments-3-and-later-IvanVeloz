@@ -37,7 +37,8 @@ struct aesd_dev aesd_device = {
     .we.size = KMALLOC_MAX_SIZE,
     .we.index = 0,
     .we.complete = false,
-    .cb_size = 0
+    .cb_size = 0,
+    .cb_ioctl_offs = 0
 };
 void aesd_cleanup_module(void);
 
@@ -93,10 +94,11 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     ) {
         fp += (loff_t)dev->cb.entry[j].size;
     }
-    mutex_unlock(&dev->cb_mutex);
     fp += write_cmd_offset;
-    filp->f_pos = fp;
-    PDEBUG("adjusted filp->f_pos  to %llu", fp);
+    dev->cb_ioctl_offs = fp;
+    PDEBUG("adjusted dev->cb_ioctls_offs to %llu", fp);
+    mutex_unlock(&dev->cb_mutex);
+
 
     return retval;
 }
@@ -136,19 +138,25 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     struct aesd_dev *dev = filp->private_data;
     struct aesd_buffer_entry * starting_entry = NULL;
     size_t starting_entry_offset = 0;
-
+    ssize_t read_pos = 0;
     //PDEBUG("the current process is \"%s\" (pid %i)\n", 
     //    current->comm, current->pid);
     //PDEBUG("read %zu bytes with offset %lld\n",count,*f_pos);
-    PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
+    //PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
     
     if (mutex_lock_interruptible(&dev->cb_mutex))
         return -ERESTARTSYS;
 
+    // Apply the ioctl position as a permanent offset
+    read_pos = (size_t)(*f_pos) + dev->cb_ioctl_offs;
+    //dev->cb_ioctl_offs = 0;
+    PDEBUG("read_pos = %lu, dev->cb_ioctl_offs = %lu, *f_pos = %llu",
+        read_pos, dev->cb_ioctl_offs, *f_pos);
+
     // Get the buffer we will start reading from
     starting_entry = aesd_circular_buffer_find_entry_offset_for_fpos(
         &dev->cb,
-        (size_t)(*f_pos),
+        (size_t)(read_pos),
         &starting_entry_offset);
     if(starting_entry == NULL) {
         goto out;
@@ -183,7 +191,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
                 retval = -EFAULT;
                 goto out;
             }
-            *f_pos += n;
+            *f_pos += n - dev->cb_ioctl_offs; // remove ioctl offset
             retval = n;
             //PDEBUG("sent %lu bytes",n);
             goto out;
@@ -207,7 +215,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     };
 
     PDEBUG("write %zu bytes with offset %lld\n",count,*f_pos);
-    PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
+    //PDEBUG("*f_pos = %llu, filp->f_pos = %llu", *f_pos, filp->f_pos);
     /*
      * Write to the circular buffer.
      * If buffer becomes full, free the memory from the entry you are going to 

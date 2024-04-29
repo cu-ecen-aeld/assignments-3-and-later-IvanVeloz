@@ -53,6 +53,7 @@ struct aesd_dev
     struct mutex we_mutex;                      /* Locking primitive */
     struct aesd_circular_buffer cb;             /* Circular buffer */
     ssize_t cb_size;                            /* size */
+    ssize_t cb_ioctl_offs;                      /* f_pos offset set by ioctl */
     struct mutex cb_mutex;                      /* Locking primitive */
 };
 
