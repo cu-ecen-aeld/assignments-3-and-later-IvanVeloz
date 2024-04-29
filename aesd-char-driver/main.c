@@ -95,6 +95,7 @@ static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd,
     }
     mutex_unlock(&dev->cb_mutex);
     fp += write_cmd_offset;
+    filp->f_pos = fp;
 
     return retval;
 }
@@ -115,6 +116,8 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
                 retval = -EFAULT;
             }
             else {
+                PDEBUG("write_cmd = %u, write_cmd_offset = %u\n", 
+                    st.write_cmd, st.write_cmd_offset);
                 retval = aesd_adjust_file_offset(filp, st.write_cmd, 
                                           st.write_cmd_offset);
             }
