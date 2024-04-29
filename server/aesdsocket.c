@@ -336,28 +336,29 @@ int appenddata(int rsfd, int dfd, pthread_mutex_t *dfdmutex) {
             /* send ioc command */
             ioctl(dfd, AESDCHAR_IOCSEEKTO, seekto);
             free(seekto);
-            readcount = ioccmdpos;
+        }
+        else {
+            do {
+                clock_gettime(CLOCK_REALTIME,&timeout);
+                timeout.tv_nsec += (POLL_TIMEOUT_MS*1000);
+            } while(pthread_mutex_timedlock(dfdmutex,&timeout));
+            writecount = write(dfd, buf, readcount);
+            pthread_mutex_unlock(dfdmutex);
+
+            if(writecount == -1) {
+                log_errno("appenddata(): data write()");
+                goto errorcleanup;
+            }
+            /* Case removed to allow command evaluation
+            else if(writecount < readcount) {
+                syslog(LOG_ERR, "appenddata(): write(): %m");
+                syslog(LOG_ERR, "caused by writecount=%li < readcount=%li", (
+                        long unsigned) writecount, (long unsigned) readcount);
+                goto errorcleanup;
+            }
+            */
         }
 
-        do {
-            clock_gettime(CLOCK_REALTIME,&timeout);
-            timeout.tv_nsec += (POLL_TIMEOUT_MS*1000);
-        } while(pthread_mutex_timedlock(dfdmutex,&timeout));
-        writecount = write(dfd, buf, readcount);
-        pthread_mutex_unlock(dfdmutex);
-
-        if(writecount == -1) {
-            log_errno("appenddata(): data write()");
-            goto errorcleanup;
-        }
-        /* Case removed to allow command evaluation
-        else if(writecount < readcount) {
-            syslog(LOG_ERR, "appenddata(): write(): %m");
-            syslog(LOG_ERR, "caused by writecount=%li < readcount=%li", (
-                    long unsigned) writecount, (long unsigned) readcount);
-            goto errorcleanup;
-        }
-        */
         if(readcount < buf_len) {
         // Read all of the datafile and write into the socket
             for(int pos=0,rc=-1; rc!=0; pos += rc) {
